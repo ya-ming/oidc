@@ -1,6 +1,6 @@
 # oidc
 
-Base on OAuth in action
+Base on OAuth in action (https://github.com/oauthinaction/oauth-in-action-code)
 
 ```sh
 npm install
@@ -20,3 +20,9 @@ node authorizationServer.js
 node protectedResource.js
 node client.js
 ```
+
+## functionalities to add
+
+* User authentication
+* Session management
+* ...
