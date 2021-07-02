@@ -30,8 +30,8 @@ app.set('json spaces', 4);
 
 // authorization server information
 var authServer = {
-	authorizationEndpoint: 'http://localhost:9001/authorize',
-	tokenEndpoint: 'http://localhost:9001/token'
+	authorizationEndpoint: 'http://20.0.0.25:9001/authorize',
+	tokenEndpoint: 'http://20.0.0.25:9001/token'
 };
 
 // client information
@@ -39,8 +39,8 @@ var clients = [
 	{
 		"client_id": "oauth-client-1",
 		"client_secret": "oauth-client-secret-1",
-		"redirect_uris": ["http://localhost:9000/callback"],
-		"post_logout_redirect_uri": "http://localhost:9000/post_logout_redirect_uri",
+		"redirect_uris": ["http://10.0.0.10:9000/callback"],
+		"post_logout_redirect_uri": "http://10.0.0.10:9000/post_logout_redirect_uri",
 		"scope": "openid profile email phone address"
 	}
 ];
@@ -382,7 +382,7 @@ app.use('/', express.static('files/authorizationServer'));
 // clear the database
 nosql.clear();
 
-var server = app.listen(9001, 'localhost', function () {
+var server = app.listen(9001, '20.0.0.25', function () {
 	var host = server.address().address;
 	var port = server.address().port;
 
