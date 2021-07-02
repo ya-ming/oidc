@@ -237,12 +237,7 @@ app.get('/userinfo', function (req, res) {
 });
 
 app.get('/logout', function (req, res) {
-	req.session.state = null;
-	req.session.access_token = null;
-	req.session.refresh_token = null;
-	req.session.scope = null;
-	req.session.id_token = null;
-	req.session.userInfo = null;
+	req.session.destroy();
 
 	var logout = buildUrl(authServer.logoutEndpoint, {
 		client_id: client.client_id,
@@ -255,27 +250,6 @@ app.get('/post_logout_redirect_uri', function (req, res) {
 })
 
 app.use('/', express.static('files/client'));
-
-var getSessionById = function (sessionId) {
-	return __.find(sessions, function (session) { return session.sessionId == sessionId; });
-};
-
-var getSessionByState = function (req, res, state, cb) {
-	var session = null;
-	var sessionId = null;
-	req.sessionStore.all((err, sessions) => {
-		for (let key in sessions) {
-			console.log(key, sessions[key]);
-			if (sessions[key].state) {
-				if (sessions[key].state == state) {
-					session = sessions[key]
-					sessionId = key;
-				}
-			}
-		}
-		cb(req, res, sessionId, session, state);
-	});
-};
 
 var buildUrl = function (base, options, hash) {
 	var newUrl = url.parse(base, true);
