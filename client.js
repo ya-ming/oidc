@@ -10,7 +10,6 @@ var randomstring = require("randomstring");
 var jose = require('jsrsasign');
 var base64url = require('base64url');
 var __ = require('underscore');
-const { Stats } = require("fs");
 __.string = require('underscore.string');
 
 
@@ -165,6 +164,7 @@ app.get("/callback", function (req, res) {
 
 								// save just the payload, not the container (which has been validated)
 								req.session.id_token = payload;
+								req.session.id_token_hint = body.id_token;
 							}
 						}
 					}
@@ -237,11 +237,12 @@ app.get('/userinfo', function (req, res) {
 });
 
 app.get('/logout', function (req, res) {
-	req.session.destroy();
-
 	var logout = buildUrl(authServer.logoutEndpoint, {
 		client_id: client.client_id,
+		id_token_hint: req.session.id_token_hint,
 	});
+
+	req.session.destroy();
 	res.redirect(logout);
 });
 
@@ -274,6 +275,6 @@ var encodeClientCredentials = function (clientId, clientSecret) {
 var server = app.listen(9000, '10.0.0.10', function () {
 	var host = server.address().address;
 	var port = server.address().port;
-	console.log('OAuth Client is listening at http://%s:%s', host, port);
+	console.log('OIDC Client is listening at http://%s:%s', host, port);
 });
 

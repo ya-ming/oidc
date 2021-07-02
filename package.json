@@ -7,7 +7,7 @@
 				"express": "^4.13.1",
 				"express-session": "^1.17.2",
 				"jsrsasign": "^5.0.0",
-				"nosql": "^3.0.3",
+				"nosql": "^6.1.0",
 				"qs": "^4.0.0",
 				"randomstring": "^1.0.7",
 				"request": "^2.58.0",

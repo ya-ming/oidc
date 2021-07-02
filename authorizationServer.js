@@ -145,7 +145,7 @@ app.get("/authorize", function (req, res) {
 		// not logged in
 		console.log('not logged in, redirect to /login');
 		var newUrl = buildUrl('/login', req.query);
-		res.render('login', {login_url: newUrl});
+		res.render('login', { login_url: newUrl });
 	} else {
 		var client = getClient(req.query.client_id);
 
@@ -284,7 +284,6 @@ app.post("/token", function (req, res) {
 			if (code.request.client_id == clientId) {
 
 				var access_token = randomstring.generate();
-				nosql.insert({ access_token: access_token, client_id: clientId, scope: code.scope, user: code.user });
 
 				console.log('Issuing access token %s', access_token);
 				console.log('with scope %s', code.scope);
@@ -318,6 +317,13 @@ app.post("/token", function (req, res) {
 					token_response.id_token = id_token;
 				}
 
+				// save data into the database
+				nosql.insert({
+					access_token: access_token, client_id: clientId,
+					scope: code.scope, user: code.user,
+					id_token: id_token
+				});
+
 				res.status(200).json(token_response);
 				console.log('Issued tokens for code %s', req.body.code);
 
@@ -338,14 +344,28 @@ app.post("/token", function (req, res) {
 	}
 });
 
-app.get('/logout', function(req, res) {
+app.get('/logout', function (req, res) {
 	req.session.destroy();
-	client = getClient(req.query.client_id);
+	var client = getClient(req.query.client_id);
 	if (!client) {
 		console.log('Unknown client %s', req.query.client_id);
 		res.render('error', { error: 'Unknown client' });
 	}
-	
+
+	// delete tokens generated for the user
+	var inToken = req.query.id_token_hint;
+	console.log('Removing record for client_id:' + client.client_id);
+	console.log('Removing record for id_token:' + inToken);
+
+	nosql.remove().make(function(builder) {
+		builder.and();
+		builder.where('id_token', inToken);
+		builder.where('client_id', client.client_id);
+		builder.callback(function(err, count) {
+		  console.log("Removed %s tokens", count);
+		});
+	});
+
 	res.redirect(client.post_logout_redirect_uri);
 });
 
@@ -386,6 +406,6 @@ var server = app.listen(9001, '20.0.0.25', function () {
 	var host = server.address().address;
 	var port = server.address().port;
 
-	console.log('OAuth Authorization Server is listening at http://%s:%s', host, port);
+	console.log('OIDC Authorization Server is listening at http://%s:%s', host, port);
 });
 

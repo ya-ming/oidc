@@ -29,7 +29,7 @@ var resource = {
 	"description": "This data has been protected by OAuth 2.0"
 };
 
-var getAccessToken = function(req, res, next) {
+var getAccessToken = function (req, res, next) {
 	// check the auth header first
 	var auth = req.headers['authorization'];
 	var inToken = null;
@@ -41,13 +41,13 @@ var getAccessToken = function(req, res, next) {
 	} else if (req.query && req.query.access_token) {
 		inToken = req.query.access_token
 	}
-	
+
 	console.log('Incoming token: %s', inToken);
-	nosql.one(function(token) {
+	nosql.one(function (token) {
 		if (token.access_token == inToken) {
-			return token;	
+			return token;
 		}
-	}, function(err, token) {
+	}, function (err, token) {
 		if (token) {
 			console.log("We found a matching token: %s", inToken);
 		} else {
@@ -57,10 +57,10 @@ var getAccessToken = function(req, res, next) {
 		next();
 		return;
 	});
-	
+
 };
 
-var requireAccessToken = function(req, res, next) {
+var requireAccessToken = function (req, res, next) {
 	if (req.access_token) {
 		next();
 	} else {
@@ -70,64 +70,64 @@ var requireAccessToken = function(req, res, next) {
 
 app.options('/resource', cors());
 
-app.post("/resource", cors(), getAccessToken, function(req, res){
+app.post("/resource", cors(), getAccessToken, function (req, res) {
 	console.log(req.access_token);
 	if (req.access_token) {
 		res.json(resource);
 	} else {
 		res.status(401).end();
 	}
-	
+
 });
 
-var userInfoEndpoint = function(req, res) {
-	
+var userInfoEndpoint = function (req, res) {
+
 	if (!__.contains(req.access_token.scope, 'openid')) {
 		res.status(403).end();
 		return;
 	}
-	
+
 	var user = req.access_token.user;
 	if (!user) {
 		res.status(404).end();
 		return;
 	}
-	
+
 	var out = {};
 	__.each(req.access_token.scope, function (scope) {
 		if (scope == 'openid') {
-			__.each(['sub'], function(claim) {
+			__.each(['sub'], function (claim) {
 				if (user[claim]) {
 					out[claim] = user[claim];
 				}
 			});
 		} else if (scope == 'profile') {
-			__.each(['name', 'family_name', 'given_name', 'middle_name', 'nickname', 'preferred_username', 'profile', 'picture', 'website', 'gender', 'birthdate', 'zoneinfo', 'locale', 'updated_at'], function(claim) {
+			__.each(['name', 'family_name', 'given_name', 'middle_name', 'nickname', 'preferred_username', 'profile', 'picture', 'website', 'gender', 'birthdate', 'zoneinfo', 'locale', 'updated_at'], function (claim) {
 				if (user[claim]) {
 					out[claim] = user[claim];
 				}
 			});
 		} else if (scope == 'email') {
-			__.each(['email', 'email_verified'], function(claim) {
+			__.each(['email', 'email_verified'], function (claim) {
 				if (user[claim]) {
 					out[claim] = user[claim];
 				}
 			});
 		} else if (scope == 'address') {
-			__.each(['address'], function(claim) {
+			__.each(['address'], function (claim) {
 				if (user[claim]) {
 					out[claim] = user[claim];
 				}
 			});
 		} else if (scope == 'phone') {
-			__.each(['phone_number', 'phone_number_verified'], function(claim) {
+			__.each(['phone_number', 'phone_number_verified'], function (claim) {
 				if (user[claim]) {
 					out[claim] = user[claim];
 				}
 			});
 		}
 	});
-	
+
 	res.status(200).json(out);
 	return;
 };
@@ -137,9 +137,9 @@ app.post('/userinfo', getAccessToken, requireAccessToken, userInfoEndpoint);
 
 
 var server = app.listen(9002, '30.0.0.30', function () {
-  var host = server.address().address;
-  var port = server.address().port;
+	var host = server.address().address;
+	var port = server.address().port;
 
-  console.log('OAuth Resource Server is listening at http://%s:%s', host, port);
+	console.log('OIDC Resource Server is listening at http://%s:%s', host, port);
 });
- 
+
