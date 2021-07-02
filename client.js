@@ -34,7 +34,8 @@ var client = {
 var authServer = {
 	authorizationEndpoint: 'http://localhost:9001/authorize',
 	tokenEndpoint: 'http://localhost:9001/token',
-	userInfoEndpoint: 'http://localhost:9002/userinfo'
+	userInfoEndpoint: 'http://localhost:9002/userinfo',
+	logoutEndpoint: 'http://localhost:9001/logout'
 };
 
 var rsaKey = {
@@ -56,7 +57,11 @@ var id_token = null;
 var userInfo = null;
 
 app.get('/', function (req, res) {
-	res.render('index', {access_token: access_token, refresh_token: refresh_token, scope: scope});
+	res.render('login', {access_token: access_token, refresh_token: refresh_token, scope: scope});
+});
+
+app.get('/login', function (req, res) {
+	res.redirect('/authorize');
 });
 
 app.get('/authorize', function(req, res){
@@ -231,6 +236,23 @@ app.get('/userinfo', function(req, res) {
 	}
 	
 });
+
+app.get('/logout', function(req, res) {
+	var logout = buildUrl(authServer.logoutEndpoint, {
+		client_id: client.client_id,
+	});
+	res.redirect(logout);
+});
+
+app.get('/post_logout_redirect_uri', function(req, res) {
+	state = null;
+	access_token = null;
+	refresh_token = null;
+	scope = null;
+	id_token = null;
+	userInfo = null;
+	res.redirect('/');
+})
 
 app.use('/', express.static('files/client'));
 
