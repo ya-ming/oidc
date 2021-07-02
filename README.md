@@ -9,9 +9,10 @@ npm install
 ## Environment configuration
 
 Create 3 loop back interfaces on the Windows machine.
-10.0.0.10 for the client
-20.0.0.25 for the authorizationServer
-30.0.0.30 for the protectedResource
+
+* 10.0.0.10 for the client.
+* 20.0.0.25 for the authorizationServer.
+* 30.0.0.30 for the protectedResource.
 
 ## Start the programs
 
