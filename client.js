@@ -31,10 +31,10 @@ app.set('views', 'files/client');
 // client information
 
 var client = {
-	"client_id": "oauth-client-1",
-	"client_secret": "oauth-client-secret-1",
-	"redirect_uris": ["http://10.0.0.10:9000/callback"],
-	"scope": "openid profile email phone address"
+	// "client_id": "oauth-client-1",
+	// "client_secret": "oauth-client-secret-1",
+	// "redirect_uris": ["http://10.0.0.10:9000/callback"],
+	// "scope": "openid profile email phone address"
 };
 
 // authorization server information
@@ -42,7 +42,8 @@ var authServer = {
 	authorizationEndpoint: 'http://20.0.0.25:9001/authorize',
 	tokenEndpoint: 'http://20.0.0.25:9001/token',
 	userInfoEndpoint: 'http://30.0.0.30:9002/userinfo',
-	logoutEndpoint: 'http://20.0.0.25:9001/logout'
+	logoutEndpoint: 'http://20.0.0.25:9001/logout',
+	registrationEndpoint: 'http://20.0.0.25:9001/register'
 };
 
 var rsaKey = {
@@ -64,6 +65,14 @@ app.get('/login', function (req, res) {
 });
 
 app.get('/authorize', function (req, res) {
+
+	if (!client.client_id) {
+		registerClient();
+		if (!client.client_id) {
+			res.render('error', {error: 'Unable to register client.'});
+			return;
+		}
+	}
 
 	req.session.access_token = null;
 	req.session.refresh_token = null;
@@ -251,6 +260,38 @@ app.get('/post_logout_redirect_uri', function (req, res) {
 })
 
 app.use('/', express.static('files/client'));
+
+var registerClient = function() {
+	
+	var template = {
+		client_name: 'OAuth in Action Dynamic Test Client',
+		client_uri: 'http://10.0.0.10:9000/',
+		redirect_uris: ['http://10.0.0.10:9000/callback'],
+		post_logout_redirect_uri: 'http://10.0.0.10:9000/post_logout_redirect_uri',
+		grant_types: ['authorization_code'],
+		response_types: ['code'],
+		token_endpoint_auth_method: 'secret_basic',
+		scope: 'openid profile email phone address'
+	};
+
+	var headers = {
+		'Content-Type': 'application/json',
+		'Accept': 'application/json'
+	};
+	
+	var regRes = request('POST', authServer.registrationEndpoint, {
+			body: JSON.stringify(template),
+			headers: headers
+	});
+	
+	if (regRes.statusCode == 201) {
+		var body = JSON.parse(regRes.getBody());
+		console.log("Got registered client", body);
+		if (body.client_id) {
+			client = body;
+		}
+	}
+};
 
 var buildUrl = function (base, options, hash) {
 	var newUrl = url.parse(base, true);

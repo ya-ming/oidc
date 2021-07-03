@@ -66,7 +66,6 @@ var accounts = [
 ]
 
 var userInfo = {
-
 	"alice": {
 		"sub": "9XE3-JI34-00132A",
 		"preferred_username": "alice",
@@ -82,7 +81,6 @@ var userInfo = {
 		"email": "bob.loblob@example.net",
 		"email_verified": false
 	}
-
 };
 
 var getUser = function (username) {
@@ -357,16 +355,129 @@ app.get('/logout', function (req, res) {
 	console.log('Removing record for client_id:' + client.client_id);
 	console.log('Removing record for id_token:' + inToken);
 
-	nosql.remove().make(function(builder) {
+	nosql.remove().make(function (builder) {
 		builder.and();
 		builder.where('id_token', inToken);
 		builder.where('client_id', client.client_id);
-		builder.callback(function(err, count) {
-		  console.log("Removed %s tokens", count);
+		builder.callback(function (err, count) {
+			console.log("Removed %s tokens", count);
 		});
 	});
 
 	res.redirect(client.post_logout_redirect_uri);
+});
+
+app.post('/register', function (req, res) {
+	var reg = {};
+
+	// First, we’ll see what the client has asked for as an authentication method. If
+	// it hasn’t specified one, we’re going to default to using a client secret over HTTP Basic.
+	if (!req.body.token_endpoint_auth_method) {
+		reg.token_endpoint_auth_method = 'secret_basic';
+	} else {
+		reg.token_endpoint_auth_method = req.body.token_endpoint_auth_method;
+	}
+
+	if (!__.contains(['secret_basic', 'secret_post', 'none'],
+		reg.token_endpoint_auth_method)) {
+		res.status(400).json({ error: 'invalid_client_metadata' });
+		return;
+	}
+
+	// Next, we’ll read in the grant_type and response_type values and ensure that
+	// they are consistent.
+
+	// no grant type
+	if (!req.body.grant_types) {
+		// no response type
+		if (!req.body.response_types) {
+			reg.grant_types = ['authorization_code'];
+			reg.response_type = ['code'];
+		} else {
+			// has response type, check if it is 'code'
+			if (__.contains(req.body.response_types, 'code')) {
+				reg.grant_types = ['authorization_code'];
+				reg.response_types = ['code'];
+			} else {
+				reg.grant_type = [];
+			}
+		}
+	} else { // has grant type
+		// no response type
+		if (!req.body.response_types) {
+			reg.grant_types = req.body.grant_types;
+			// check if grant type is 'authorization_code'
+			if (__.contains(req.body.grant_types, 'authorization_code')) {
+				reg.response_types = ['code'];
+			} else {
+				reg.response_types = [];
+			}
+		} else {
+			// has response type
+			reg.grant_types = req.body.grant_types;
+			reg.response_types = req.body.response_types;
+			if (__.contains(req.body.grant_types, 'authorization_code') &&
+				!__.contains(req.body.response_types, 'code')) {
+				reg.response_types.push('code');
+			}
+			if (!__.contains(req.body.grant_types, 'authorization_code') &&
+				__.contains(req.body.response_types, 'code')) {
+				reg.grant_types.push('authorization_code');
+			}
+		}
+	}
+
+	if (!__.isEmpty(__.without(reg.grant_types, 'authorization_code', 'refresh_token')) ||
+		!__.isEmpty(__.without(reg.response_types, 'code'))) {
+		res.status(400).json({ error: 'invalid_client_metadata' });
+		return;
+	}
+
+	// Next, we’ll make sure that the client has registered at least one redirect URI.
+	if (!req.body.redirect_uris || !__.isArray(req.body.redirect_uris) ||
+		__.isEmpty(req.body.redirect_uris)) {
+		res.status(400).json({ error: 'invalid_redirect_uri' });
+		return;
+	} else {
+		reg.redirect_uris = req.body.redirect_uris;
+	}
+
+	// Next, we’ll copy over the other fields that we care about, checking their data types on
+	// the way.
+	if (typeof (req.body.client_name) == 'string') {
+		reg.client_name = req.body.client_name;
+	}
+
+	if (typeof (req.body.client_uri) == 'string') {
+		reg.client_uri = req.body.client_uri;
+	}
+
+	if (typeof (req.body.post_logout_redirect_uri) == 'string') {
+		reg.post_logout_redirect_uri = req.body.post_logout_redirect_uri;
+	}
+
+	if (typeof (req.body.logo_uri) == 'string') {
+		reg.logo_uri = req.body.logo_uri;
+	}
+
+	if (typeof (req.body.scope) == 'string') {
+		reg.scope = req.body.scope;
+	}
+
+	// Finally, we’ll generate a client ID and, if the client is using an appropriate token endpoint
+	// authentication method, a client secret.
+	reg.client_id = randomstring.generate();
+	if (__.contains(['client_secret_basic', 'client_secret_post']), reg.token_endpoint_auth_method) {
+		reg.client_secret = randomstring.generate();
+	}
+
+	reg.client_id_created_at = Math.floor(Date.now() / 1000);
+	reg.client_secret_expires_at = 0;
+
+	clients.push(reg);
+
+	res.status(201).json(reg);
+	return;
 });
 
 var buildUrl = function (base, options, hash) {
