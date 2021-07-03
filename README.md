@@ -38,9 +38,10 @@ node client.js
 * Dynamic client registration
 * authorizationServer publishes its configuration at /.well-known/openid-configuration
 * client fetches authorizationServer configuration before registering to the authorizationServer
+* authorizationServer publishes its jwks at /jwks
+* client fetches the public key from /jwks
 
 ## Functionalities to add
 
-* authorizationServer publishes its jwks at /jwks
 * client verifies the signature of the token via the key from address-of-authorizationServer/jwks
 * back-channel log out
