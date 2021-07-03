@@ -1,6 +1,6 @@
 # oidc - openid-connect
 
-* authorizationServer, protectedResource, and client
+* authorizationServer, protectedResource, and client node.js webservers.
 
 Base on OAuth in action (https://github.com/oauthinaction/oauth-in-action-code)
 
