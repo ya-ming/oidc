@@ -1,4 +1,6 @@
-# oidc
+# oidc - openid-connect
+
+* authorizationServer, protectedResource, and client
 
 Base on OAuth in action (https://github.com/oauthinaction/oauth-in-action-code)
 
@@ -39,9 +41,8 @@ node client.js
 * authorizationServer publishes its configuration at /.well-known/openid-configuration
 * client fetches authorizationServer configuration before registering to the authorizationServer
 * authorizationServer publishes its jwks at /jwks
-* client fetches the public key from /jwks
+* client verifies the signature of the token via the key from address-of-authorizationServer/jwks
 
 ## Functionalities to add
 
-* client verifies the signature of the token via the key from address-of-authorizationServer/jwks
 * back-channel log out
