@@ -19,6 +19,7 @@ Create 3 loop back interfaces on the Windows machine.
 ```sh
 node authorizationServer.js
 # OIDC Authorization Server is listening at http://20.0.0.25:9001
+# http://20.0.0.25:9001/.well-known/openid-configuration
 
 node protectedResource.js
 # OIDC Resource Server is listening at http://30.0.0.30:9002
