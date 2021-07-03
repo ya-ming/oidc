@@ -34,7 +34,8 @@ var authServer = {
 	tokenEndpoint: 'http://20.0.0.25:9001/token',
 	userInfoEndpoint: 'http://30.0.0.30:9002/userinfo',
 	logoutEndpoint: 'http://20.0.0.25:9001/logout',
-	registrationEndpoint: 'http://20.0.0.25:9001/register'
+	registrationEndpoint: 'http://20.0.0.25:9001/register',
+	jwksEndpoint: 'http://20.0.0.25:9001/jwks'
 };
 
 // client information
@@ -485,6 +486,13 @@ app.post('/register', function (req, res) {
 
 app.get('/.well-known/openid-configuration', function(req, res) {
 	res.status(200).json(authServer);
+	return;
+});
+
+app.get('/jwks', function(req, res) {
+	rsaKeyTemp = Object.assign({}, rsaKey);
+	delete rsaKeyTemp["d"];
+	res.status(200).json(rsaKeyTemp);
 	return;
 });
 

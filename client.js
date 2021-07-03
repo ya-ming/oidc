@@ -44,15 +44,16 @@ var authServer = {
 	// userInfoEndpoint: 'http://30.0.0.30:9002/userinfo',
 	// logoutEndpoint: 'http://20.0.0.25:9001/logout',
 	// registrationEndpoint: 'http://20.0.0.25:9001/register'
+	// jwksEndpoint: 'http://20.0.0.25:9001/jwks'
 	openid_configuration: 'http://20.0.0.25:9001/.well-known/openid-configuration'
 };
 
 var rsaKey = {
-	"alg": "RS256",
-	"e": "AQAB",
-	"n": "p8eP5gL1H_H9UNzCuQS-vNRVz3NWxZTHYk1tG9VpkfFjWNKG3MFTNZJ1l5g_COMm2_2i_YhQNH8MJ_nQ4exKMXrWJB4tyVZohovUxfw-eLgu1XQ8oYcVYW8ym6Um-BkqwwWL6CXZ70X81YyIMrnsGTyTV6M8gBPun8g2L8KbDbXR1lDfOOWiZ2ss1CRLrmNM-GRp3Gj-ECG7_3Nx9n_s5to2ZtwJ1GS1maGjrSZ9GRAYLrHhndrL_8ie_9DS2T-ML7QNQtNkg2RvLv4f0dpjRYI23djxVtAylYK4oiT_uEMgSkc4dxwKwGuBxSO0g9JOobgfy0--FUHHYtRi0dOFZw",
-	"kty": "RSA",
-	"kid": "authserver"
+	// "alg": "RS256",
+	// "e": "AQAB",
+	// "n": "p8eP5gL1H_H9UNzCuQS-vNRVz3NWxZTHYk1tG9VpkfFjWNKG3MFTNZJ1l5g_COMm2_2i_YhQNH8MJ_nQ4exKMXrWJB4tyVZohovUxfw-eLgu1XQ8oYcVYW8ym6Um-BkqwwWL6CXZ70X81YyIMrnsGTyTV6M8gBPun8g2L8KbDbXR1lDfOOWiZ2ss1CRLrmNM-GRp3Gj-ECG7_3Nx9n_s5to2ZtwJ1GS1maGjrSZ9GRAYLrHhndrL_8ie_9DS2T-ML7QNQtNkg2RvLv4f0dpjRYI23djxVtAylYK4oiT_uEMgSkc4dxwKwGuBxSO0g9JOobgfy0--FUHHYtRi0dOFZw",
+	// "kty": "RSA",
+	// "kid": "authserver"
 };
 
 var protectedResource = 'http://30.0.0.30:9002/resource';
@@ -299,13 +300,21 @@ var registerClient = function () {
 };
 
 var fetchAuthServerConfiguration = function () {
-	var configuration = request('GET', authServer.openid_configuration);
+	var configurationRes = request('GET', authServer.openid_configuration);
 
-	if (configuration.statusCode == 200) {
-		var body = JSON.parse(configuration.getBody());
+	if (configurationRes.statusCode == 200) {
+		var body = JSON.parse(configurationRes.getBody());
 		console.log("Got authorizationServer configuration", body);
 		body.openid_configuration = authServer.openid_configuration;
 		authServer = body;
+	}
+
+	var jwksRes = request('GET', authServer.jwksEndpoint);
+
+	if (jwksRes.statusCode == 200) {
+		var body = JSON.parse(jwksRes.getBody());
+		console.log("Got jwks", body);
+		rsaKey = body;
 	}
 }
 
