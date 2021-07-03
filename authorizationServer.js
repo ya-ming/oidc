@@ -31,7 +31,10 @@ app.set('json spaces', 4);
 // authorization server information
 var authServer = {
 	authorizationEndpoint: 'http://20.0.0.25:9001/authorize',
-	tokenEndpoint: 'http://20.0.0.25:9001/token'
+	tokenEndpoint: 'http://20.0.0.25:9001/token',
+	userInfoEndpoint: 'http://30.0.0.30:9002/userinfo',
+	logoutEndpoint: 'http://20.0.0.25:9001/logout',
+	registrationEndpoint: 'http://20.0.0.25:9001/register'
 };
 
 // client information
@@ -477,6 +480,11 @@ app.post('/register', function (req, res) {
 	clients.push(reg);
 
 	res.status(201).json(reg);
+	return;
+});
+
+app.get('/.well-known/openid-configuration', function(req, res) {
+	res.status(200).json(authServer);
 	return;
 });
 

@@ -35,10 +35,11 @@ node client.js
 * Session management
   * RP initiated logout - pass id_token_hint to authorizationServer when user logs out.
 * Dynamic client registration
+* authorizationServer publishes its configuration at /.well-known/openid-configuration
+* client fetches authorizationServer configuration before registering to the authorizationServer
 
 ## Functionalities to add
 
-* authorizationServer publishes its configuration at /.well-known/openid-configuration
 * authorizationServer publishes its jwks at /jwks
-* client verify the signature of the token via the key from address-of-authorizationServer/jwks
+* client verifies the signature of the token via the key from address-of-authorizationServer/jwks
 * back-channel log out

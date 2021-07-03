@@ -39,11 +39,12 @@ var client = {
 
 // authorization server information
 var authServer = {
-	authorizationEndpoint: 'http://20.0.0.25:9001/authorize',
-	tokenEndpoint: 'http://20.0.0.25:9001/token',
-	userInfoEndpoint: 'http://30.0.0.30:9002/userinfo',
-	logoutEndpoint: 'http://20.0.0.25:9001/logout',
-	registrationEndpoint: 'http://20.0.0.25:9001/register'
+	// authorizationEndpoint: 'http://20.0.0.25:9001/authorize',
+	// tokenEndpoint: 'http://20.0.0.25:9001/token',
+	// userInfoEndpoint: 'http://30.0.0.30:9002/userinfo',
+	// logoutEndpoint: 'http://20.0.0.25:9001/logout',
+	// registrationEndpoint: 'http://20.0.0.25:9001/register'
+	openid_configuration: 'http://20.0.0.25:9001/.well-known/openid-configuration'
 };
 
 var rsaKey = {
@@ -66,10 +67,14 @@ app.get('/login', function (req, res) {
 
 app.get('/authorize', function (req, res) {
 
+	if (!authServer.authorizationEndpoint) {
+		fetchAuthServerConfiguration();
+	}
+
 	if (!client.client_id) {
 		registerClient();
 		if (!client.client_id) {
-			res.render('error', {error: 'Unable to register client.'});
+			res.render('error', { error: 'Unable to register client.' });
 			return;
 		}
 	}
@@ -261,8 +266,8 @@ app.get('/post_logout_redirect_uri', function (req, res) {
 
 app.use('/', express.static('files/client'));
 
-var registerClient = function() {
-	
+var registerClient = function () {
+
 	var template = {
 		client_name: 'OAuth in Action Dynamic Test Client',
 		client_uri: 'http://10.0.0.10:9000/',
@@ -278,12 +283,12 @@ var registerClient = function() {
 		'Content-Type': 'application/json',
 		'Accept': 'application/json'
 	};
-	
+
 	var regRes = request('POST', authServer.registrationEndpoint, {
-			body: JSON.stringify(template),
-			headers: headers
+		body: JSON.stringify(template),
+		headers: headers
 	});
-	
+
 	if (regRes.statusCode == 201) {
 		var body = JSON.parse(regRes.getBody());
 		console.log("Got registered client", body);
@@ -292,6 +297,17 @@ var registerClient = function() {
 		}
 	}
 };
+
+var fetchAuthServerConfiguration = function () {
+	var configuration = request('GET', authServer.openid_configuration);
+
+	if (configuration.statusCode == 200) {
+		var body = JSON.parse(configuration.getBody());
+		console.log("Got authorizationServer configuration", body);
+		body.openid_configuration = authServer.openid_configuration;
+		authServer = body;
+	}
+}
 
 var buildUrl = function (base, options, hash) {
 	var newUrl = url.parse(base, true);
