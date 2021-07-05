@@ -5,13 +5,14 @@ var session = require('express-session');
 var randomstring = require("randomstring");
 var cons = require('consolidate');
 var nosql = require('nosql').load('database.nosql');
+var nosql_logout = require('nosql').load('logout.nosql');
 var querystring = require('querystring');
 var qs = require("qs");
 var __ = require('underscore');
 __.string = require('underscore.string');
 var base64url = require('base64url');
 var jose = require('jsrsasign');
-const { request } = require("http");
+var request = require("sync-request");
 
 var app = express();
 
@@ -35,7 +36,8 @@ var authServer = {
 	userInfoEndpoint: 'http://30.0.0.30:9002/userinfo',
 	logoutEndpoint: 'http://20.0.0.25:9001/logout',
 	registrationEndpoint: 'http://20.0.0.25:9001/register',
-	jwksEndpoint: 'http://20.0.0.25:9001/jwks'
+	jwksEndpoint: 'http://20.0.0.25:9001/jwks',
+	backchannel_logout_supported: true
 };
 
 // client information
@@ -45,6 +47,7 @@ var clients = [
 		"client_secret": "oauth-client-secret-1",
 		"redirect_uris": ["http://10.0.0.10:9000/callback"],
 		"post_logout_redirect_uri": "http://10.0.0.10:9000/post_logout_redirect_uri",
+		"backchannel_logout_uri": "http://10.0.0.10:9000/backchannel_logout_uri",
 		"scope": "openid profile email phone address"
 	}
 ];
@@ -323,7 +326,9 @@ app.post("/token", function (req, res) {
 				nosql.insert({
 					access_token: access_token, client_id: clientId,
 					scope: code.scope, user: code.user,
-					id_token: id_token
+					sub: code.user.sub,
+					id_token: id_token,
+					logout: false
 				});
 
 				res.status(200).json(token_response);
@@ -356,17 +361,71 @@ app.get('/logout', function (req, res) {
 
 	// delete tokens generated for the user
 	var inToken = req.query.id_token_hint;
-	console.log('Removing record for client_id:' + client.client_id);
-	console.log('Removing record for id_token:' + inToken);
-
+	console.log('Before removing record for client_id:' + client.client_id);
+	console.log('       removing record for id_token:' + inToken);
 	nosql.remove().make(function (builder) {
 		builder.and();
-		builder.where('id_token', inToken);
 		builder.where('client_id', client.client_id);
+		builder.where('id_token', inToken);
 		builder.callback(function (err, count) {
 			console.log("Removed %s tokens", count);
 		});
 	});
+
+	// save the sub and ask user if they want to logout from all RPs logged in
+	rsaKeyTemp = Object.assign({}, rsaKey);
+	delete rsaKeyTemp["d"];
+	var pubKey = jose.KEYUTIL.getKey(rsaKeyTemp);
+	var tokenParts = inToken.split('.');
+	var payload = JSON.parse(base64url.decode(tokenParts[1]));
+	console.log('Payload', payload);
+	if (jose.jws.JWS.verify(inToken, pubKey, [rsaKey.alg])) {
+		console.log('Signature validated.');
+		sub = payload.sub;
+		console.log('/logout sub=' + sub);
+
+		// nosql.modify({ logout: true }).make(function (builder) {
+		// 	builder.where('id_token', inToken);
+		// 	builder.callback(function (err, count) {
+		// 		console.log('updated documents:', count);
+		// 	});
+		// });
+
+		// nosql_logout generated when redirecting the user to confirm if he/she
+		// wants to logout from all RPs
+		// random string 'xxx' is used to hide the sub of this user
+		var xxx = randomstring.generate();
+		nosql_logout.insert({ sub: sub, xxx: xxx });
+
+		var newUrl = buildUrl('/logout/confirm', {
+			xxx: xxx,
+			client_id: client.client_id
+		});
+		res.redirect(newUrl);
+	} else {
+		res.status('400').json({ error: 'invalid_token_hint' });
+	}
+
+});
+
+app.get('/logout/confirm', function (req, res) {
+	var newUrl = buildUrl('/logout/confirm', req.query);
+	res.render('logout', { logout_url: newUrl });
+	return;
+});
+
+app.post('/logout/confirm', function (req, res) {
+	// retrive xxx from the query, convert xxx back to sub in findSubFromDB()
+	var xxx = req.query.xxx;
+	var client_id = req.query.client_id;
+	var client = getClient(client_id);
+
+	// log out from all RPs for this user
+	if (req.body.Yes) {
+		findSubFromDB(xxx);
+	} else {
+		// do not logout from all RPs
+	}
 
 	res.redirect(client.post_logout_redirect_uri);
 });
@@ -460,6 +519,9 @@ app.post('/register', function (req, res) {
 		reg.post_logout_redirect_uri = req.body.post_logout_redirect_uri;
 	}
 
+	if (typeof (req.body.backchannel_logout_uri) == 'string') {
+		reg.backchannel_logout_uri = req.body.backchannel_logout_uri;
+	}
 	if (typeof (req.body.logo_uri) == 'string') {
 		reg.logo_uri = req.body.logo_uri;
 	}
@@ -484,12 +546,12 @@ app.post('/register', function (req, res) {
 	return;
 });
 
-app.get('/.well-known/openid-configuration', function(req, res) {
+app.get('/.well-known/openid-configuration', function (req, res) {
 	res.status(200).json(authServer);
 	return;
 });
 
-app.get('/jwks', function(req, res) {
+app.get('/jwks', function (req, res) {
 	rsaKeyTemp = Object.assign({}, rsaKey);
 	delete rsaKeyTemp["d"];
 	res.status(200).json(rsaKeyTemp);
@@ -524,10 +586,87 @@ var decodeClientCredentials = function (auth) {
 	return { id: clientId, secret: clientSecret };
 };
 
+var findSubFromDB = function (xxx) {
+	nosql_logout.find().make(function (builder) {
+		builder.where('xxx', xxx);
+		builder.callback(function (err, response) {
+			console.log('Found sub:', response[0].sub);
+
+			logoutFromAllRPs(response[0].sub);
+
+			// remove the remaining records in the database for this user
+			nosql.remove().make(function (builder) {
+				builder.and();
+				builder.where('sub', response[0].sub);
+				builder.callback(function (err, count) {
+					console.log("Removed %s tokens", count);
+				});
+			});
+		});
+	});
+
+	// clean up nosql_logout
+	nosql_logout.remove().make(function (builder) {
+		builder.and();
+		builder.where('xxx', xxx);
+		builder.callback(function (err, count) {
+			console.log("Removed %s logout records", count);
+		});
+	});
+
+
+}
+
+var logoutFromAllRPs = function (sub) {
+	nosql.find().make(function (builder) {
+		builder.callback(function (err, response) {
+			console.log('found client:', response);
+			for (var c = 0; c < response.length; c++) {
+				if (response[c].user.sub == sub) {
+					console.log('send back-channel log out token to client:' + response[c].client_id);
+
+					var client = getClient(response[c].client_id);
+
+					var header = { 'typ': 'JWT', 'alg': rsaKey.alg, 'kid': rsaKey.kid };
+
+					var ipayload = {
+						iss: 'http://localhost:9001/',
+						sub: sub,
+						aud: client.client_id,
+						iat: Math.floor(Date.now() / 1000),
+						jti: randomstring.generate(4),
+						events: { "http://schemas.openid.net/event/backchannel-logout": null }
+					};
+
+					var privateKey = jose.KEYUTIL.getKey(rsaKey);
+					var logout_token = jose.jws.JWS.sign(header.alg, JSON.stringify(header), JSON.stringify(ipayload), privateKey);
+
+					console.log('Issuing Logout token %s', logout_token);
+
+					var headers = {
+						'Content-Type': 'application/json',
+						'Accept': 'application/json'
+					};
+
+					var postLogoutTokenRes = request('POST', client.backchannel_logout_uri, {
+						body: JSON.stringify({ logout_token: logout_token }),
+						headers: headers
+					});
+
+					if (postLogoutTokenRes.statusCode == 200) {
+						console.log("Got postLogoutToken response");
+					}
+				}
+			}
+		});
+	});
+}
+
 app.use('/', express.static('files/authorizationServer'));
 
 // clear the database
 nosql.clear();
+nosql_logout.clear();
 
 var server = app.listen(9001, '20.0.0.25', function () {
 	var host = server.address().address;

@@ -12,6 +12,21 @@ var base64url = require('base64url');
 var __ = require('underscore');
 __.string = require('underscore.string');
 
+var argv = require('yargs/yargs')(process.argv.slice(2)).argv;
+
+var ip = '10.0.0.10';
+var port = 9000;
+
+if (argv.ip) {
+	ip = argv.ip;
+}
+
+if (argv.port) {
+	port = argv.port;
+}
+
+var base_url = 'http://' + ip + ':' + port;
+console.log('base_url: ' + base_url);
 
 var app = express();
 
@@ -33,7 +48,7 @@ app.set('views', 'files/client');
 var client = {
 	// "client_id": "oauth-client-1",
 	// "client_secret": "oauth-client-secret-1",
-	// "redirect_uris": ["http://10.0.0.10:9000/callback"],
+	// "redirect_uris": [base_url + "/callback"],
 	// "scope": "openid profile email phone address"
 };
 
@@ -265,15 +280,52 @@ app.get('/post_logout_redirect_uri', function (req, res) {
 	res.redirect('/');
 })
 
+app.post('/backchannel_logout_uri', function(req, res) {
+	if (req.body.logout_token) {
+		console.log('Got Logout token: %s', req.body.logout_token);
+
+		// check the id token
+		var pubKey = jose.KEYUTIL.getKey(rsaKey);
+		var tokenParts = req.body.logout_token.split('.');
+		var payload = JSON.parse(base64url.decode(tokenParts[1]));
+		console.log('Payload', payload);
+		if (jose.jws.JWS.verify(req.body.logout_token, pubKey, [rsaKey.alg])) {
+			console.log('Signature validated.');
+			if (payload.iss == 'http://localhost:9001/') {
+				console.log('issuer OK');
+				if ((Array.isArray(payload.aud) && __.contains(payload.aud, client.client_id)) ||
+					payload.aud == client.client_id) {
+					console.log('Audience OK');
+
+					var now = Math.floor(Date.now() / 1000);
+
+					if (payload.iat <= now) {
+						console.log('issued-at OK');
+
+						destroySession(req, payload.iss, payload.sub);
+
+						res.status(200).json();
+						return;
+					}
+				}
+			}
+		}
+	}
+
+	res.status(400).json();
+	return;
+});
+
 app.use('/', express.static('files/client'));
 
 var registerClient = function () {
 
 	var template = {
 		client_name: 'OAuth in Action Dynamic Test Client',
-		client_uri: 'http://10.0.0.10:9000/',
-		redirect_uris: ['http://10.0.0.10:9000/callback'],
-		post_logout_redirect_uri: 'http://10.0.0.10:9000/post_logout_redirect_uri',
+		client_uri: base_url + '/',
+		redirect_uris: [base_url + '/callback'],
+		post_logout_redirect_uri: base_url + '/post_logout_redirect_uri',
+		backchannel_logout_uri: base_url + '/backchannel_logout_uri',
 		grant_types: ['authorization_code'],
 		response_types: ['code'],
 		token_endpoint_auth_method: 'secret_basic',
@@ -318,6 +370,22 @@ var fetchAuthServerConfiguration = function () {
 	}
 }
 
+var destroySession = function (req, iss, sub) {
+	console.log("destroy session for iss:" + iss + ", sub:" + sub);
+
+	var sessions = req.sessionStore.sessions;
+	for (var sid in sessions) {
+		var session = JSON.parse(sessions[sid]);
+		if (session.id_token && session.id_token.iss && session.id_token.sub) {
+			console.log("sid:" + sid + ", iss:" + session.id_token.iss + ", sub:" + session.id_token.sub);
+			if (iss == session.id_token.iss && sub == session.id_token.sub){
+				console.log("destroy session sid:" + sid);
+				req.sessionStore.destroy(sid, function(err) {});
+			}
+		}
+	}
+}
+
 var buildUrl = function (base, options, hash) {
 	var newUrl = url.parse(base, true);
 	delete newUrl.search;
@@ -338,7 +406,7 @@ var encodeClientCredentials = function (clientId, clientSecret) {
 	return new Buffer(querystring.escape(clientId) + ':' + querystring.escape(clientSecret)).toString('base64');
 };
 
-var server = app.listen(9000, '10.0.0.10', function () {
+var server = app.listen(port, ip, function () {
 	var host = server.address().address;
 	var port = server.address().port;
 	console.log('OIDC Client is listening at http://%s:%s', host, port);
