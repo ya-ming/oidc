@@ -41,12 +41,15 @@ node client.js --ip=10.0.0.11 --port=9000
 * Authorization code flow
 * Session management
   * RP initiated logout - pass id_token_hint to authorizationServer when user logs out.
+  * Back-channel log out
 * Dynamic client registration
 * authorizationServer publishes its configuration at /.well-known/openid-configuration
 * client fetches authorizationServer configuration before registering to the authorizationServer
 * authorizationServer publishes its jwks at /jwks
 * client verifies the signature of the token via the key from address-of-authorizationServer/jwks
-* back-channel log out
+* Add test cases (mocha, chai)
+  * authorization server
+    * `node node_modules\mocha\bin\mocha test\as-test.js`
 
 ## Functionalities to add
 

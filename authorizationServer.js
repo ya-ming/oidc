@@ -23,6 +23,8 @@ app.use(session({
 }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true })); // support form-encoded bodies (for the token endpoint)
+app.use(bodyParser.text());
+app.use(bodyParser.json({ type: 'application/json'}));
 
 app.engine('html', cons.underscore);
 app.set('view engine', 'html');
@@ -436,12 +438,12 @@ app.post('/register', function (req, res) {
 	// First, we’ll see what the client has asked for as an authentication method. If
 	// it hasn’t specified one, we’re going to default to using a client secret over HTTP Basic.
 	if (!req.body.token_endpoint_auth_method) {
-		reg.token_endpoint_auth_method = 'secret_basic';
+		reg.token_endpoint_auth_method = 'client_secret_basic';
 	} else {
 		reg.token_endpoint_auth_method = req.body.token_endpoint_auth_method;
 	}
 
-	if (!__.contains(['secret_basic', 'secret_post', 'none'],
+	if (!__.contains(['client_secret_basic', 'secret_post', 'none'],
 		reg.token_endpoint_auth_method)) {
 		res.status(400).json({ error: 'invalid_client_metadata' });
 		return;
@@ -674,4 +676,6 @@ var server = app.listen(9001, '20.0.0.25', function () {
 
 	console.log('OIDC Authorization Server is listening at http://%s:%s', host, port);
 });
+
+module.exports = app; // for testing
 
