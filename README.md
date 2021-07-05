@@ -4,10 +4,6 @@
 
 Base on OAuth in action (https://github.com/oauthinaction/oauth-in-action-code)
 
-```sh
-npm install
-```
-
 ## Environment configuration
 
 Create 4 loop back interfaces on the Windows machine.
@@ -20,6 +16,9 @@ Create 4 loop back interfaces on the Windows machine.
 ## Start the programs
 
 ```sh
+
+npm install
+
 node authorizationServer.js
 # OIDC Authorization Server is listening at http://20.0.0.25:9001
 # http://20.0.0.25:9001/.well-known/openid-configuration
