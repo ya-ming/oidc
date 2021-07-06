@@ -1,54 +1,42 @@
 process.env.NOD_EVN = 'test';
 
 let server = require('../authorizationServer');
-let chai = require('chai');
-let chaiHttp = require('chai-http');
-let should = chai.should();
+const request = require('supertest');
+const { expect } = require('chai');
+var agent = request(server);
 
-chai.use(chaiHttp);
 describe('config', () => {
     beforeEach((done) => {
         console.log('before each test');
         done();
     });
 
-    describe('/GET invalid_url', () => {
+    describe('GET /invalid_url', () => {
         it('it should return 404', (done) => {
-            chai.request(server)
+            request(server)
                 .get('/invalid_url')
-                .end((err, res) => {
-                    res.should.have.status(404);
-                    done();
-                });
+                .expect(404, done);
         });
     });
 
-    describe('/GET .well-known/openid-configuration', () => {
-        it('it should GET the oidc configurations', (done) => {
-            chai.request(server)
+    describe('GET /.well-known/openid-configuration', () => {
+        it('Get the oidc configurations', (done) => {
+            request(server)
                 .get('/.well-known/openid-configuration')
-                .end((err, res) => {
-                    res.should.have.status(200);
-                    res.body.should.be.a('Object');
-                    done();
-                });
+                .expect(200, done);
         });
     });
 
-    describe('/GET jwks', () => {
-        it('it should GET the public key', (done) => {
-            chai.request(server)
+    describe('GET /jwks', () => {
+        it('Get the public key', (done) => {
+            request(server)
                 .get('/jwks')
-                .end((err, res) => {
-                    res.should.have.status(200);
-                    res.body.should.be.a('Object');
-                    done();
-                });
+                .expect(200, done);
         });
     });
 
-    describe('/POST register', () => {
-        it('it should POST a client registration', (done) => {
+    describe('POST /register', () => {
+        it('Client registeres to the server', (done) => {
             base_url = 'http://10.0.0.10:9000'
             var template = {
                 client_name: 'OAuth in Action Dynamic Test Client',
@@ -62,20 +50,77 @@ describe('config', () => {
                 scope: 'openid profile email phone address'
             };
 
-            chai.request(server)
+            request(server)
                 .post('/register')
                 .send(
                     template
                 )
-                .end((err, res) => {
-                    res.should.have.status(201);
-                    res.body.should.contain.keys('client_id', 'client_secret');
-                    res.body.should.have.property('token_endpoint_auth_method', 'client_secret_basic');
-                    res.body.should.have.property('grant_types').and.eql(['authorization_code']);
-                    res.body.should.have.property('response_types').and.eql(['code']);
-                    done();
-                });
+                .expect((res) => {
+                    expect((res.body)).contain.keys('client_id', 'client_secret');
+                    expect((res.body)).have.property('token_endpoint_auth_method', 'client_secret_basic');
+                    expect((res.body)).have.property('grant_types').and.eql(['authorization_code']);
+                    expect((res.body)).property('response_types').and.eql(['code']);
+                })
+                .expect(201, done);
         });
 
+    });
+
+    describe('GET /login', () => {
+        it('user tries to login', (done) => {
+            request(server)
+                .get('/login')
+                .expect(400, done);
+        });
+    });
+
+    describe('GET /authorize', () => {
+        it('user tries to authorize', (done) => {
+            request(server)
+                .get('/authorize')
+                .query({
+                    response_type: 'code',
+                    scope: 'openid',
+                    client_id: 'client_id',
+                    redirect_uri: 'https://client.example.com/cb',
+                    state: 'state'
+                })
+                .expect(200, done);
+        });
+    });
+
+    describe('POST /login', () => {
+        
+
+        it('User authenticates to the server', (done) => {
+            agent
+                .post('/login')
+                .send({ username: 'bob', password: 'bob' })
+                .query({
+                    response_type: 'code',
+                    scope: 'openid',
+                    client_id: 'client_id',
+                    redirect_uri: 'https://client.example.com/cb',
+                    state: 'state'
+                })
+                .expect('Location', '/authorize?response_type=code&scope=openid&client_id=client_id&redirect_uri=https%3A%2F%2Fclient.example.com%2Fcb&state=state')
+                .expect(302, done);
+        });
+
+        it('User authorize on the server', (done) => {
+            agent
+                .get('/authorize')
+                .query({
+                    response_type: 'code',
+                    scope: 'openid',
+                    client_id: 'client_id',
+                    redirect_uri: 'https://client.example.com/cb',
+                    state: 'state'
+                })
+                .expect((res) => {
+                    
+                })
+                .expect(200, done);
+        });
     });
 });

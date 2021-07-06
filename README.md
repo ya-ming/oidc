@@ -47,7 +47,7 @@ node client.js --ip=10.0.0.11 --port=9000
 * client fetches authorizationServer configuration before registering to the authorizationServer
 * authorizationServer publishes its jwks at /jwks
 * client verifies the signature of the token via the key from address-of-authorizationServer/jwks
-* Add test cases (mocha, chai)
+* Add test cases ([mocha](https://github.com/mochajs/mocha), [supertest](https://github.com/visionmedia/supertest), [chai](https://github.com/chaijs/chai))
   * authorization server
     * `node node_modules\mocha\bin\mocha test\as-test.js`
 

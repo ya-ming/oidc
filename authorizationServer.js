@@ -24,7 +24,7 @@ app.use(session({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true })); // support form-encoded bodies (for the token endpoint)
 app.use(bodyParser.text());
-app.use(bodyParser.json({ type: 'application/json'}));
+app.use(bodyParser.json({ type: 'application/json' }));
 
 app.engine('html', cons.underscore);
 app.set('view engine', 'html');
@@ -118,7 +118,9 @@ app.get('/', function (req, res) {
 
 app.get('/login', function (req, res) {
 	if (!req.session.loggedin) {
-		res.render('login');
+		// access to /login without redirect from /athorize is not allowed
+		res.status(400).render('error', { error: 'not allowed' });
+		return;
 	} else {
 		res.redirect('/authorize');
 	}
