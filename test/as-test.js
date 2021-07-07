@@ -16,6 +16,8 @@ function delay(interval) {
 let Cookies = null;
 let client_id = null;
 let client_secret = null;
+let reqid = null;
+let code = null;
 
 describe('config', () => {
     beforeEach((done) => {
@@ -146,9 +148,36 @@ describe('config', () => {
                     state: 'state'
                 })
                 .expect((res) => {
-
+                    // save the reqid
+                    let index = res.text.indexOf('name="reqid" value="');
+                    let end = res.text.indexOf('"', index + 20);
+                    reqid = res.text.substring(index + 20, end);
                 })
                 .expect(200, done);
+        });
+
+        delay(1000);
+
+        it('User approve on the server', (done) => {
+            agent
+                .post('/approve')
+                .set('Cookie', Cookies)
+                .query({
+                    response_type: 'code',
+                    scope: 'openid',
+                    client_id: client_id,
+                    redirect_uri: 'http://client.example.com/cb',
+                    state: 'state'
+                })
+                .send({approve: 'approve', reqid: reqid})
+                .expect((res) => {
+                    expect(res.headers).have.property('location');
+                    // save the code
+                    location = res.headers['location'];
+                    code = location.substring(location.indexOf('code=') + 5, location.indexOf('&state='));
+                    expect(code.length, 8);
+                })
+                .expect(302, done);
         });
     });
 });
