@@ -170,35 +170,14 @@ app.get("/callback", function (req, res) {
 
 			console.log('Got ID token: %s', body.id_token);
 
-			// check the id token
-			var pubKey = jose.KEYUTIL.getKey(rsaKey);
+			// validate the id token
 			var tokenParts = body.id_token.split('.');
 			var payload = JSON.parse(base64url.decode(tokenParts[1]));
 			console.log('Payload', payload);
-			if (jose.jws.JWS.verify(body.id_token, pubKey, [rsaKey.alg])) {
-				console.log('Signature validated.');
-				if (payload.iss == 'http://localhost:9001/') {
-					console.log('issuer OK');
-					if ((Array.isArray(payload.aud) && __.contains(payload.aud, client.client_id)) ||
-						payload.aud == client.client_id) {
-						console.log('Audience OK');
-
-						var now = Math.floor(Date.now() / 1000);
-
-						if (payload.iat <= now) {
-							console.log('issued-at OK');
-							if (payload.exp >= now) {
-								console.log('expiration OK');
-
-								console.log('Token valid!');
-
-								// save just the payload, not the container (which has been validated)
-								req.session.id_token = payload;
-								req.session.id_token_hint = body.id_token;
-							}
-						}
-					}
-				}
+			if (validateIdToken(rsaKey, body, payload, client.client_id)) {
+				// save just the payload, not the container (which has been validated)
+				req.session.id_token = payload;
+				req.session.id_token_hint = body.id_token;
 			}
 			res.render('userinfo', { userInfo: req.session.userInfo, id_token: req.session.id_token });
 			return;
@@ -209,7 +188,6 @@ app.get("/callback", function (req, res) {
 		res.render('error', { error: 'Unable to fetch access token, server response: ' + tokRes.statusCode })
 		return;
 	}
-
 });
 
 app.get('/fetch_resource', function (req, res) {
@@ -280,7 +258,7 @@ app.get('/post_logout_redirect_uri', function (req, res) {
 	res.redirect('/');
 })
 
-app.post('/backchannel_logout_uri', function(req, res) {
+app.post('/backchannel_logout_uri', function (req, res) {
 	if (req.body.logout_token) {
 		console.log('Got Logout token: %s', req.body.logout_token);
 
@@ -378,9 +356,9 @@ var destroySession = function (req, iss, sub) {
 		var session = JSON.parse(sessions[sid]);
 		if (session.id_token && session.id_token.iss && session.id_token.sub) {
 			console.log("sid:" + sid + ", iss:" + session.id_token.iss + ", sub:" + session.id_token.sub);
-			if (iss == session.id_token.iss && sub == session.id_token.sub){
+			if (iss == session.id_token.iss && sub == session.id_token.sub) {
 				console.log("destroy session sid:" + sid);
-				req.sessionStore.destroy(sid, function(err) {});
+				req.sessionStore.destroy(sid, function (err) { });
 			}
 		}
 	}
@@ -406,9 +384,37 @@ var encodeClientCredentials = function (clientId, clientSecret) {
 	return new Buffer(querystring.escape(clientId) + ':' + querystring.escape(clientSecret)).toString('base64');
 };
 
+var validateIdToken = function (rsaKey, body, payload, client_id) {
+	var pubKey = jose.KEYUTIL.getKey(rsaKey);
+	if (jose.jws.JWS.verify(body.id_token, pubKey, [rsaKey.alg])) {
+		console.log('Signature validated.');
+		if (payload.iss == 'http://localhost:9001/') {
+			console.log('issuer OK');
+			if ((Array.isArray(payload.aud) && __.contains(payload.aud, client_id)) ||
+				payload.aud == client_id) {
+				console.log('Audience OK');
+
+				var now = Math.floor(Date.now() / 1000);
+
+				if (payload.iat <= now) {
+					console.log('issued-at OK');
+					if (payload.exp >= now) {
+						console.log('expiration OK');
+						console.log('Token valid!');
+						return true;
+					}
+				}
+			}
+		}
+	}
+	return false;
+}
+
 var server = app.listen(port, ip, function () {
 	var host = server.address().address;
 	var port = server.address().port;
 	console.log('OIDC Client is listening at http://%s:%s', host, port);
 });
 
+exports.encodeClientCredentials = encodeClientCredentials;
+exports.validateIdToken = validateIdToken;

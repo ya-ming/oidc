@@ -3,25 +3,31 @@ process.env.NOD_EVN = 'test';
 let server = require('../authorizationServer');
 const request = require('supertest');
 const { expect } = require('chai');
+var base64url = require('base64url');
 
+const client = require('../client');
 var agent = request(server);
 
 function delay(interval) {
-    return it('should delay', done => {
+    return it('delay', done => {
         setTimeout(() => done(), interval)
 
     }).timeout(interval + 100) // The extra 100ms should guarantee the test will not fail due to exceeded timeout
 }
 
+let rsaKey = null;
 let Cookies = null;
 let client_id = null;
 let client_secret = null;
 let reqid = null;
 let code = null;
+let access_token = null;
+let id_token = null;
+const delays = 200;
 
 describe('config', () => {
     beforeEach((done) => {
-        console.log('before each test');
+        // console.log('before each test');
         done();
     });
 
@@ -46,6 +52,9 @@ describe('config', () => {
         it('Get the public key', (done) => {
             request(server)
                 .get('/jwks')
+                .expect((res) => {
+                    rsaKey = res.body;
+                })
                 .expect(200, done);
         });
     });
@@ -81,7 +90,7 @@ describe('config', () => {
                 .expect(201, done);
         });
 
-        delay(1000);
+        delay(delays);
     });
 
     // User to Authorization Server
@@ -96,11 +105,11 @@ describe('config', () => {
                 });
         });
 
-        delay(1000);
+        delay(delays);
     });
 
-    describe('GET /authorize', () => {
-        it('user tries to authorize', (done) => {
+    describe('User login, authorize, client fetch the id_token', () => {
+        it('GET /authorize: User tries to authorize', (done) => {
             agent
                 .get('/authorize')
                 .set('Cookie', Cookies)
@@ -114,11 +123,9 @@ describe('config', () => {
                 .expect(200, done);
         });
 
-        delay(1000);
-    });
+        delay(delays);
 
-    describe('POST /login', () => {
-        it('User authenticates to the server', (done) => {
+        it('POST /login: User authenticates to the server', (done) => {
             agent
                 .post('/login')
                 .set('Cookie', Cookies)
@@ -134,9 +141,9 @@ describe('config', () => {
                     client_id + '&redirect_uri=http%3A%2F%2Fclient.example.com%2Fcb&state=state')
                 .expect(302, done);
         });
-        delay(1000);
+        delay(delays);
 
-        it('User authorize on the server', (done) => {
+        it('GET /authorize: User authorize on the server', (done) => {
             agent
                 .get('/authorize')
                 .set('Cookie', Cookies)
@@ -156,9 +163,9 @@ describe('config', () => {
                 .expect(200, done);
         });
 
-        delay(1000);
+        delay(delays);
 
-        it('User approve on the server', (done) => {
+        it('POST /approve: User approve on the server', (done) => {
             agent
                 .post('/approve')
                 .set('Cookie', Cookies)
@@ -169,7 +176,7 @@ describe('config', () => {
                     redirect_uri: 'http://client.example.com/cb',
                     state: 'state'
                 })
-                .send({approve: 'approve', reqid: reqid})
+                .send({approve: 'approve', reqid: reqid, scope_openid: 'scope_openid'})
                 .expect((res) => {
                     expect(res.headers).have.property('location');
                     // save the code
@@ -179,5 +186,29 @@ describe('config', () => {
                 })
                 .expect(302, done);
         });
+
+        it('POST /token: Client fetch tokens', (done) => {
+            agent
+                .post('/token')
+                .set('Content-Type', 'application/x-www-form-urlencoded')
+                .set('Authorization', 'Basic ' + client.encodeClientCredentials(client_id, client_secret))
+                .send({
+                    grant_type: 'authorization_code',
+                    code: code,
+                    redirect_uri: 'http://client.example.com/cb',
+                    state: 'state'
+                })
+                .expect((res) => {
+                    expect((res.body)).contain.keys('access_token', 'id_token');
+                    access_token = res.body.access_token;
+                    id_token = res.body.id_token;
+                    var tokenParts = res.body.id_token.split('.');
+                    var payload = JSON.parse(base64url.decode(tokenParts[1]));
+                    expect(client.validateIdToken(rsaKey, res.body, payload, client_id)).to.be.true;
+                })
+                .expect(200, done);
+        });
+
+        delay(delays);
     });
 });

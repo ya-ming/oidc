@@ -579,7 +579,9 @@ var buildUrl = function (base, options, hash) {
 };
 
 var getScopesFromForm = function (body) {
-	return __.filter(__.keys(body), function (s) { return __.string.startsWith(s, 'scope_'); })
+	return __.filter(__.keys(body), function (s) {
+		return __.string.startsWith(s, 'scope_');
+	})
 		.map(function (s) { return s.slice('scope_'.length); });
 };
 
