@@ -63,3 +63,7 @@ node client.js --ip=10.0.0.11 --port=9000
 * protect and error handling for all protectedResource server APIs
 * https
 * store session data into database
+* user management
+  * register
+  * change password
+  * delete account
