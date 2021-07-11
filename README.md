@@ -50,6 +50,8 @@ node client.js --ip=10.0.0.11 --port=9000
 * Add test cases ([mocha](https://github.com/mochajs/mocha), [supertest](https://github.com/visionmedia/supertest), [chai](https://github.com/chaijs/chai))
   * authorization server
     * `node node_modules\mocha\bin\mocha test\as-test.js`
+* user management
+  * store user into database
 
 ## Functionalities to add
 

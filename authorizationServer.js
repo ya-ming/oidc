@@ -6,6 +6,7 @@ var randomstring = require("randomstring");
 var cons = require('consolidate');
 var nosql = require('nosql').load('database.nosql');
 var nosql_logout = require('nosql').load('logout.nosql');
+var nosql_accounts = require('nosql').load('accounts.nosql');
 var querystring = require('querystring');
 var qs = require("qs");
 var __ = require('underscore');
@@ -104,6 +105,35 @@ var getAccount = function (username) {
 	return __.find(accounts, function (account) { return account.username == username; });
 };
 
+var getAccountFromDB = function (req, res, next) {
+	username = req.body.username;
+	password = req.body.password;
+	if (!username || !password) {
+		res.render('error', { error: 'invalid username or password' });
+		return;
+	}
+
+	nosql_accounts.find().make(function (builder) {
+		builder.where('username', username);
+		builder.callback(function (err, response) {
+			if (response[0]) {
+				console.log("We found the account: ", response[0]);
+				var account = response[0];
+				if (account.password != password) {
+					res.render('error', { error: 'invalid username or password' });
+					return;
+				}
+			} else {
+				console.log('No matching account was found.');
+				res.render('error', { error: 'invalid username or password' });
+			}
+			next();
+			return;
+		});
+	});
+};
+
+
 var getClient = function (clientId) {
 	return __.find(clients, function (client) { return client.client_id == clientId; });
 };
@@ -126,20 +156,7 @@ app.get('/login', function (req, res) {
 	}
 })
 
-app.post('/login', function (req, res) {
-	username = req.body.username;
-	password = req.body.password;
-	if (!username || !password) {
-		res.render('error', { error: 'invalid username or password' });
-		return;
-	}
-
-	var account = getAccount(username);
-	if (!account || account.password != password) {
-		res.render('error', { error: 'invalid username or password' });
-		return;
-	}
-
+app.post('/login', getAccountFromDB, function (req, res) {
 	// user authentication passed, update the session and redirect user to authorize
 	req.session.loggedin = true;
 	req.session.username = username;
@@ -149,7 +166,6 @@ app.post('/login', function (req, res) {
 })
 
 app.get("/authorize", function (req, res) {
-
 	if (!req.session.loggedin) {
 		// not logged in
 		console.log('not logged in, redirect to /login');
@@ -167,7 +183,6 @@ app.get("/authorize", function (req, res) {
 			res.render('error', { error: 'Invalid redirect URI' });
 			return;
 		} else {
-
 			var rscope = req.query.scope ? req.query.scope.split(' ') : undefined;
 			var cscope = client.scope ? client.scope.split(' ') : undefined;
 			if (__.difference(rscope, cscope).length > 0) {
@@ -186,13 +201,10 @@ app.get("/authorize", function (req, res) {
 			res.render('approve', { username: req.session.username, client: client, reqid: reqid, scope: rscope });
 			return;
 		}
-
 	}
-
 });
 
 app.post('/approve', function (req, res) {
-
 	var reqid = req.body.reqid;
 	var query = requests[reqid];
 	delete requests[reqid];
@@ -249,7 +261,6 @@ app.post('/approve', function (req, res) {
 });
 
 app.post("/token", function (req, res) {
-
 	var auth = req.headers['authorization'];
 	if (auth) {
 		// check the auth header
