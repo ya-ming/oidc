@@ -52,6 +52,8 @@ node client.js --ip=10.0.0.11 --port=9000
     * `node node_modules\mocha\bin\mocha test\as-test.js`
 * user management
   * store user into database
+  * register
+  * change password
 
 ## Functionalities to add
 
@@ -66,6 +68,4 @@ node client.js --ip=10.0.0.11 --port=9000
 * https
 * store session data into database
 * user management
-  * register
-  * change password
   * delete account
