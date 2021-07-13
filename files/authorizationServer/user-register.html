@@ -45,6 +45,7 @@
 
     <div class="jumbotron">
       <form class="form" action="/user-register" method="POST">
+        <input type="hidden" name="_csrf" value="<%- csrfToken %>">
         <lable>Info:</lable> <%- error %></br></br>
         <label for="username"><b>Username</b></label>
         <input type="text" placeholder="Enter Username" name="username" required></br>

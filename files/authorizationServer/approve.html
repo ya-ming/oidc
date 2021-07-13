@@ -52,6 +52,7 @@
 		   <form class="form" action="/approve" method="POST">
 			   <label>User: </label><label><%- username %></label>
 			   <input type="hidden" name="reqid" value="<%- reqid %>">
+			   <input type="hidden" name="_csrf" value="<%- csrfToken %>">
 			   <% if (scope) { %>
 			   <p>The client is requesting access to the following:</p>
 			   <ul>

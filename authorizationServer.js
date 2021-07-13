@@ -15,6 +15,10 @@ var base64url = require('base64url');
 var jose = require('jsrsasign');
 var request = require("sync-request");
 
+var cookieParser = require('cookie-parser');
+var csrf = require('csurf');
+var csrfProtection = csrf({ cookie: true });
+
 var app = express();
 
 app.use(session({
@@ -26,6 +30,8 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true })); // support form-encoded bodies (for the token endpoint)
 app.use(bodyParser.text());
 app.use(bodyParser.json({ type: 'application/json' }));
+
+app.use(cookieParser());
 
 app.engine('html', cons.underscore);
 app.set('view engine', 'html');
@@ -309,44 +315,44 @@ app.get('/', function (req, res) {
 	res.render('index', { info: '', clients: clients, authServer: authServer });
 });
 
-app.get('/user-register', function (req, res) {
-	res.render('user-register', { error: '' });
+app.get('/user-register', csrfProtection, function (req, res) {
+	res.render('user-register', { csrfToken: req.csrfToken(), error: '' });
 });
 
-app.post('/user-register', function (req, res) {
+app.post('/user-register', csrfProtection, function (req, res) {
 	var username = req.body.username;
 	var password = req.body.password;
 	var password_repeat = req.body.password_repeat;
 
 	if (!username || !password || !password_repeat) {
-		res.render('user-register', { error: 'Please fill in all required fileds' });
+		res.render('user-register', { csrfToken: req.csrfToken(), error: 'Please fill in all required fileds' });
 		return;
 	}
 
 	if (password != password_repeat) {
-		res.render('user-register', { error: 'passwords do not match' });
+		res.render('user-register', { csrfToken: req.csrfToken(), error: 'passwords do not match' });
 		return;
 	}
 
 	checkIfAccountExists(req, res, user_register);
 });
 
-app.get('/change-password', isLoggedIn, function (req, res) {
-	res.render('change-password', { error: '' });
+app.get('/change-password', csrfProtection, isLoggedIn, function (req, res) {
+	res.render('change-password', { csrfToken: req.csrfToken(), error: '' });
 });
 
-app.post('/change-password', isLoggedIn, function (req, res) {
+app.post('/change-password', csrfProtection, isLoggedIn, function (req, res) {
 	var password = req.body.password;
 	var password_new = req.body.password_new;
 	var password_repeat = req.body.password_repeat;
 
 	if (!password || !password_new || !password_repeat) {
-		res.render('change-password', { error: 'Please fill in all required fileds' });
+		res.render('change-password', { csrfToken: req.csrfToken(), error: 'Please fill in all required fileds' });
 		return;
 	}
 
 	if (password_new != password_repeat) {
-		res.render('change-password', { error: 'passwords do not match' });
+		res.render('change-password', { csrfToken: req.csrfToken(), error: 'passwords do not match' });
 		return;
 	}
 
@@ -363,7 +369,7 @@ app.get('/login', function (req, res) {
 	}
 })
 
-app.post('/login', getAccountFromDB, function (req, res) {
+app.post('/login', csrfProtection, getAccountFromDB, function (req, res) {
 	// user authentication passed, update the session and redirect user to authorize
 	req.session.loggedin = true;
 	req.session.username = username;
@@ -372,12 +378,12 @@ app.post('/login', getAccountFromDB, function (req, res) {
 	res.redirect(newUrl);
 })
 
-app.get("/authorize", function (req, res) {
+app.get("/authorize", csrfProtection, function (req, res) {
 	if (!req.session.loggedin) {
 		// not logged in
 		console.log('not logged in, redirect to /login');
 		var newUrl = buildUrl('/login', req.query);
-		res.render('login', { login_url: newUrl });
+		res.render('login', { csrfToken: req.csrfToken(), login_url: newUrl });
 		return;
 	} else {
 		var client = getClient(req.query.client_id);
@@ -406,13 +412,13 @@ app.get("/authorize", function (req, res) {
 
 			requests[reqid] = req.query;
 
-			res.render('approve', { username: req.session.username, client: client, reqid: reqid, scope: rscope });
+			res.render('approve', { csrfToken: req.csrfToken(), username: req.session.username, client: client, reqid: reqid, scope: rscope });
 			return;
 		}
 	}
 });
 
-app.post('/approve', isLoggedIn, function (req, res) {
+app.post('/approve', csrfProtection, isLoggedIn, function (req, res) {
 	var reqid = req.body.reqid;
 	var query = requests[reqid];
 	delete requests[reqid];
