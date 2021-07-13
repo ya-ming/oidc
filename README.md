@@ -54,6 +54,8 @@ node client.js --ip=10.0.0.11 --port=9000
   * store user into database
   * register
   * change password
+* Security protections
+  * csrf
 
 ## Functionalities to add
 
