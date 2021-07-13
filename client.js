@@ -73,228 +73,16 @@ var rsaKey = {
 
 var protectedResource = 'http://30.0.0.30:9002/resource';
 
-app.get('/', function (req, res) {
-	res.render('login', { access_token: req.session.access_token, refresh_token: req.session.refresh_token, scope: req.session.scope });
-});
+// helper functions
 
-app.get('/login', function (req, res) {
-	res.redirect('/authorize');
-});
-
-app.get('/authorize', function (req, res) {
-
-	if (!authServer.authorizationEndpoint) {
-		fetchAuthServerConfiguration();
-	}
-
-	if (!client.client_id) {
-		registerClient();
-		if (!client.client_id) {
-			res.render('error', { error: 'Unable to register client.' });
-			return;
-		}
-	}
-
-	req.session.access_token = null;
-	req.session.refresh_token = null;
-	req.session.scope = null;
-	req.session.state = randomstring.generate();
-
-	var authorizeUrl = buildUrl(authServer.authorizationEndpoint, {
-		response_type: 'code',
-		scope: client.scope,
-		client_id: client.client_id,
-		redirect_uri: client.redirect_uris[0],
-		state: req.session.state
-	});
-
-	console.log("redirect", authorizeUrl);
-	res.redirect(authorizeUrl);
-});
-
-app.get("/callback", function (req, res) {
-
-	if (req.query.error) {
-		// it's an error response, act accordingly
-		res.render('error', { error: req.query.error });
+var isLoggedIn = function (req, res, next) {
+	if (!req.session.loggedin) {
+		res.redirect('/');
 		return;
 	}
-
-	var resState = req.query.state;
-
-	if (resState == req.session.state) {
-		console.log('State value matches: expected %s got %s', session.state, resState);
-	} else {
-		console.log('State DOES NOT MATCH: got %s', resState);
-		res.render('error', { error: 'State value did not match' });
-		return;
-	}
-
-	var code = req.query.code;
-
-	var form_data = qs.stringify({
-		grant_type: 'authorization_code',
-		code: code,
-		redirect_uri: client.redirect_uris[0]
-	});
-	var headers = {
-		'Content-Type': 'application/x-www-form-urlencoded',
-		'Authorization': 'Basic ' + encodeClientCredentials(client.client_id, client.client_secret)
-	};
-
-	var tokRes = request('POST', authServer.tokenEndpoint,
-		{
-			body: form_data,
-			headers: headers
-		}
-	);
-
-	console.log('Requesting access token for code %s', code);
-
-	if (tokRes.statusCode >= 200 && tokRes.statusCode < 300) {
-		var body = JSON.parse(tokRes.getBody());
-
-		req.session.access_token = body.access_token;
-		console.log('Got access token: %s', req.session.access_token);
-		if (body.refresh_token) {
-			req.session.refresh_token = body.refresh_token;
-			console.log('Got refresh token: %s', req.session.refresh_token);
-		}
-
-		scope = body.scope;
-		console.log('Got scope: %s', scope);
-
-		if (body.id_token) {
-			req.session.userInfo = null;
-			req.session.id_token = null;
-
-			console.log('Got ID token: %s', body.id_token);
-
-			// validate the id token
-			var tokenParts = body.id_token.split('.');
-			var payload = JSON.parse(base64url.decode(tokenParts[1]));
-			console.log('Payload', payload);
-			if (validateIdToken(rsaKey, body, payload, client.client_id)) {
-				// save just the payload, not the container (which has been validated)
-				req.session.id_token = payload;
-				req.session.id_token_hint = body.id_token;
-			}
-			res.render('userinfo', { userInfo: req.session.userInfo, id_token: req.session.id_token });
-			return;
-		}
-		res.render('index', { access_token: req.session.access_token, refresh_token: req.session.refresh_token, scope: req.session.scope });
-		return;
-	} else {
-		res.render('error', { error: 'Unable to fetch access token, server response: ' + tokRes.statusCode })
-		return;
-	}
-});
-
-app.get('/fetch_resource', function (req, res) {
-
-	if (!req.session.access_token) {
-		res.render('error', { error: 'Missing access token.' });
-		return;
-	}
-
-	console.log('Making request with access token %s', req.session.access_token);
-
-	var headers = {
-		'Authorization': 'Bearer ' + req.session.access_token,
-		'Content-Type': 'application/x-www-form-urlencoded'
-	};
-
-	var resource = request('POST', protectedResource,
-		{ headers: headers }
-	);
-
-	if (resource.statusCode >= 200 && resource.statusCode < 300) {
-		var body = JSON.parse(resource.getBody());
-		res.render('data', { resource: body });
-		return;
-	} else {
-		req.session.access_token = null;
-		res.render('error', { error: 'Server returned response code: ' + resource.statusCode });
-		return;
-	}
-
-});
-
-app.get('/userinfo', function (req, res) {
-
-	var headers = {
-		'Authorization': 'Bearer ' + req.session.access_token
-	};
-
-	var resource = request('GET', authServer.userInfoEndpoint,
-		{ headers: headers }
-	);
-	if (resource.statusCode >= 200 && resource.statusCode < 300) {
-		var body = JSON.parse(resource.getBody());
-		console.log('Got data: ', body);
-
-		req.session.userInfo = body;
-
-		res.render('userinfo', { userInfo: req.session.userInfo, id_token: req.session.id_token });
-		return;
-	} else {
-		res.render('error', { error: 'Unable to fetch user information' });
-		return;
-	}
-
-});
-
-app.get('/logout', function (req, res) {
-	var logout = buildUrl(authServer.logoutEndpoint, {
-		client_id: client.client_id,
-		id_token_hint: req.session.id_token_hint,
-	});
-
-	req.session.destroy();
-	res.redirect(logout);
-});
-
-app.get('/post_logout_redirect_uri', function (req, res) {
-	res.redirect('/');
-})
-
-app.post('/backchannel_logout_uri', function (req, res) {
-	if (req.body.logout_token) {
-		console.log('Got Logout token: %s', req.body.logout_token);
-
-		// check the id token
-		var pubKey = jose.KEYUTIL.getKey(rsaKey);
-		var tokenParts = req.body.logout_token.split('.');
-		var payload = JSON.parse(base64url.decode(tokenParts[1]));
-		console.log('Payload', payload);
-		if (jose.jws.JWS.verify(req.body.logout_token, pubKey, [rsaKey.alg])) {
-			console.log('Signature validated.');
-			if (payload.iss == 'http://localhost:9001/') {
-				console.log('issuer OK');
-				if ((Array.isArray(payload.aud) && __.contains(payload.aud, client.client_id)) ||
-					payload.aud == client.client_id) {
-					console.log('Audience OK');
-
-					var now = Math.floor(Date.now() / 1000);
-
-					if (payload.iat <= now) {
-						console.log('issued-at OK');
-
-						destroySession(req, payload.iss, payload.sub);
-
-						res.status(200).json();
-						return;
-					}
-				}
-			}
-		}
-	}
-
-	res.status(400).json();
+	next();
 	return;
-});
-
-app.use('/', express.static('files/client'));
+}
 
 var registerClient = function () {
 
@@ -409,6 +197,239 @@ var validateIdToken = function (rsaKey, body, payload, client_id) {
 	}
 	return false;
 }
+
+// Routes
+
+app.get('/', function (req, res) {
+	res.render('login', { access_token: req.session.access_token, refresh_token: req.session.refresh_token, scope: req.session.scope });
+});
+
+app.get('/login', function (req, res) {
+	res.redirect('/authorize');
+});
+
+app.get('/authorize', function (req, res) {
+
+	// render 'userinfo' if already logged in
+	if (req.session.loggedin) {
+		res.render('userinfo', { userInfo: req.session.userInfo, id_token: req.session.id_token });
+		return;
+	}
+
+	// if not authenticated, start oidc procedure
+	if (!authServer.authorizationEndpoint) {
+		fetchAuthServerConfiguration();
+	}
+
+	if (!client.client_id) {
+		registerClient();
+		if (!client.client_id) {
+			res.render('error', { error: 'Unable to register client.' });
+			return;
+		}
+	}
+
+	req.session.access_token = null;
+	req.session.refresh_token = null;
+	req.session.scope = null;
+	req.session.loggedin = false;
+	req.session.state = randomstring.generate();
+
+	var authorizeUrl = buildUrl(authServer.authorizationEndpoint, {
+		response_type: 'code',
+		scope: client.scope,
+		client_id: client.client_id,
+		redirect_uri: client.redirect_uris[0],
+		state: req.session.state
+	});
+
+	console.log("redirect", authorizeUrl);
+	res.redirect(authorizeUrl);
+});
+
+app.get("/callback", function (req, res) {
+
+	if (req.query.error) {
+		// it's an error response, act accordingly
+		res.render('error', { error: req.query.error });
+		return;
+	}
+
+	var resState = req.query.state;
+
+	if (resState == req.session.state) {
+		console.log('State value matches: expected %s got %s', session.state, resState);
+	} else {
+		console.log('State DOES NOT MATCH: got %s', resState);
+		res.render('error', { error: 'State value did not match' });
+		return;
+	}
+
+	var code = req.query.code;
+
+	var form_data = qs.stringify({
+		grant_type: 'authorization_code',
+		code: code,
+		redirect_uri: client.redirect_uris[0]
+	});
+	var headers = {
+		'Content-Type': 'application/x-www-form-urlencoded',
+		'Authorization': 'Basic ' + encodeClientCredentials(client.client_id, client.client_secret)
+	};
+
+	var tokRes = request('POST', authServer.tokenEndpoint,
+		{
+			body: form_data,
+			headers: headers
+		}
+	);
+
+	console.log('Requesting access token for code %s', code);
+
+	if (tokRes.statusCode >= 200 && tokRes.statusCode < 300) {
+		var body = JSON.parse(tokRes.getBody());
+
+		req.session.access_token = body.access_token;
+		console.log('Got access token: %s', req.session.access_token);
+		if (body.refresh_token) {
+			req.session.refresh_token = body.refresh_token;
+			console.log('Got refresh token: %s', req.session.refresh_token);
+		}
+
+		scope = body.scope;
+		console.log('Got scope: %s', scope);
+
+		if (body.id_token) {
+			req.session.userInfo = null;
+			req.session.id_token = null;
+
+			console.log('Got ID token: %s', body.id_token);
+
+			// validate the id token
+			var tokenParts = body.id_token.split('.');
+			var payload = JSON.parse(base64url.decode(tokenParts[1]));
+			console.log('Payload', payload);
+			if (validateIdToken(rsaKey, body, payload, client.client_id)) {
+				// save just the payload, not the container (which has been validated)
+				req.session.id_token = payload;
+				req.session.id_token_hint = body.id_token;
+				req.session.loggedin = true;
+			}
+			res.render('userinfo', { userInfo: req.session.userInfo, id_token: req.session.id_token });
+			return;
+		}
+		res.render('index', { access_token: req.session.access_token, refresh_token: req.session.refresh_token, scope: req.session.scope });
+		return;
+	} else {
+		res.render('error', { error: 'Unable to fetch access token, server response: ' + tokRes.statusCode })
+		return;
+	}
+});
+
+app.get('/fetch_resource', function (req, res) {
+
+	if (!req.session.access_token) {
+		res.render('error', { error: 'Missing access token.' });
+		return;
+	}
+
+	console.log('Making request with access token %s', req.session.access_token);
+
+	var headers = {
+		'Authorization': 'Bearer ' + req.session.access_token,
+		'Content-Type': 'application/x-www-form-urlencoded'
+	};
+
+	var resource = request('POST', protectedResource,
+		{ headers: headers }
+	);
+
+	if (resource.statusCode >= 200 && resource.statusCode < 300) {
+		var body = JSON.parse(resource.getBody());
+		res.render('data', { resource: body });
+		return;
+	} else {
+		req.session.access_token = null;
+		res.render('error', { error: 'Server returned response code: ' + resource.statusCode });
+		return;
+	}
+
+});
+
+app.get('/userinfo', isLoggedIn, function (req, res) {
+	var headers = {
+		'Authorization': 'Bearer ' + req.session.access_token
+	};
+
+	var resource = request('GET', authServer.userInfoEndpoint,
+		{ headers: headers }
+	);
+	if (resource.statusCode >= 200 && resource.statusCode < 300) {
+		var body = JSON.parse(resource.getBody());
+		console.log('Got data: ', body);
+
+		req.session.userInfo = body;
+
+		res.render('userinfo', { userInfo: req.session.userInfo, id_token: req.session.id_token });
+		return;
+	} else {
+		res.render('error', { error: 'Unable to fetch user information' });
+		return;
+	}
+
+});
+
+app.get('/logout', isLoggedIn, function (req, res) {
+	var logout = buildUrl(authServer.logoutEndpoint, {
+		client_id: client.client_id,
+		id_token_hint: req.session.id_token_hint,
+	});
+
+	req.session.destroy();
+	res.redirect(logout);
+});
+
+app.get('/post_logout_redirect_uri', function (req, res) {
+	res.redirect('/');
+})
+
+app.post('/backchannel_logout_uri', function (req, res) {
+	if (req.body.logout_token) {
+		console.log('Got Logout token: %s', req.body.logout_token);
+
+		// check the id token
+		var pubKey = jose.KEYUTIL.getKey(rsaKey);
+		var tokenParts = req.body.logout_token.split('.');
+		var payload = JSON.parse(base64url.decode(tokenParts[1]));
+		console.log('Payload', payload);
+		if (jose.jws.JWS.verify(req.body.logout_token, pubKey, [rsaKey.alg])) {
+			console.log('Signature validated.');
+			if (payload.iss == 'http://localhost:9001/') {
+				console.log('issuer OK');
+				if ((Array.isArray(payload.aud) && __.contains(payload.aud, client.client_id)) ||
+					payload.aud == client.client_id) {
+					console.log('Audience OK');
+
+					var now = Math.floor(Date.now() / 1000);
+
+					if (payload.iat <= now) {
+						console.log('issued-at OK');
+
+						destroySession(req, payload.iss, payload.sub);
+
+						res.status(200).json();
+						return;
+					}
+				}
+			}
+		}
+	}
+
+	res.status(400).json();
+	return;
+});
+
+app.use('/', express.static('files/client'));
 
 var server = app.listen(port, ip, function () {
 	var host = server.address().address;

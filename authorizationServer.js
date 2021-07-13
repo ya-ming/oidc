@@ -294,6 +294,15 @@ var logoutFromAllRPs = function (sub) {
 	});
 }
 
+var isLoggedIn = function(req, res, next) {
+	if (!req.session.loggedin) {
+		res.render('index', { info: 'not allowed', clients: clients, authServer: authServer });
+		return;
+	}
+	next();
+	return;
+}
+
 // Routes
 
 app.get('/', function (req, res) {
@@ -322,20 +331,11 @@ app.post('/user-register', function (req, res) {
 	checkIfAccountExists(req, res, user_register);
 });
 
-app.get('/change-password', function (req, res) {
-	if (!req.session.loggedin) {
-		res.render('index', { info: 'not allowed', clients: clients, authServer: authServer });
-		return;
-	}
+app.get('/change-password', isLoggedIn, function (req, res) {
 	res.render('change-password', { error: '' });
 });
 
-app.post('/change-password', function (req, res) {
-	if (!req.session.loggedin) {
-		res.render('index', { info: 'not allowed', clients: clients, authServer: authServer });
-		return;
-	}
-	var username = req.session.username;
+app.post('/change-password', isLoggedIn, function (req, res) {
 	var password = req.body.password;
 	var password_new = req.body.password_new;
 	var password_repeat = req.body.password_repeat;
@@ -412,7 +412,7 @@ app.get("/authorize", function (req, res) {
 	}
 });
 
-app.post('/approve', function (req, res) {
+app.post('/approve', isLoggedIn, function (req, res) {
 	var reqid = req.body.reqid;
 	var query = requests[reqid];
 	delete requests[reqid];
