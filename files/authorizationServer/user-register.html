@@ -39,24 +39,24 @@
   </nav>
 
   <div class="container">
-    <div class="jumbotron">
-      <lable>Info:</lable>
-      <%- info %></br></br>
+    <h1>Register</h1>
+    <p>Please fill in this form to create an account.</p>
+    <hr>
 
-        <h2>Client information:</h2>
-        <% _.each(clients, function(client) { %>
-          <ul>
-            <li><b>client_id:</b> <code><%- client.client_id %></code></li>
-            <li><b>client_secret:</b> <code><%- client.client_secret %></code></li>
-            <li><b>scope:</b> <code><%- client.scope %></code></li>
-            <li><b>redirect_uri:</b> <code><%- client.redirect_uri %></code></li>
-          </ul>
-          <% }); %>
-            <h2>Server information:</h2>
-            <ul>
-              <li><b>authorization_endpoint:</b> <code><%- authServer.authorizationEndpoint %></code></li>
-              <li><b>token_endpoint:</b> <code><%- authServer.tokenEndpoint %></code></li>
-            </ul>
+    <div class="jumbotron">
+      <form class="form" action="/user-register" method="POST">
+        <lable>Info:</lable> <%- error %></br></br>
+        <label for="username"><b>Username</b></label>
+        <input type="text" placeholder="Enter Username" name="username" required></br>
+
+        <label for="password"><b>Password</b></label>
+        <input type="password" placeholder="Enter Password" name="password" required></br>
+
+        <label for="password_repeat"><b>Repeat Password</b></label>
+        <input type="password" placeholder="Repeat Password" name="password_repeat" required></br>
+
+        <button type="submit">Register</button>
+      </form>
     </div>
 
   </div><!-- /.container -->
