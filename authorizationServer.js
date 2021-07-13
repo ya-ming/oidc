@@ -114,9 +114,30 @@ var checkIfAccountExists = function (req, res, callback) {
 			if (response[0]) {
 				console.log("We found the account: ", response[0]);
 				res.render('user-register', { error: 'username not available' });
+				return;
 			} else {
 				callback(req, res);
 			}
+		});
+	});
+};
+
+var updatePassword = function (req, res) {
+	username = req.session.username;
+	password = req.body.password;
+	password_new = req.body.password_new;
+
+	nosql_accounts.update({ username: username, password: password_new }).make(function (builder) {
+		builder.where('username', username);
+		builder.where('password', password);
+		builder.callback(function (err, count) {
+			console.log('updated documents:', count);
+			if (count == 0) {
+				res.render('change-password', { error: 'password change failed' });
+				return;
+			}
+			res.render('index', { info: 'password updated successfully', clients: clients, authServer: authServer });
+			return;
 		});
 	});
 };
@@ -128,6 +149,7 @@ var user_register = function (req, res) {
 	});
 
 	res.render('index', { info: 'user registered successfully', clients: clients, authServer: authServer });
+	return;
 }
 
 var getAccountFromDB = function (req, res, next) {
@@ -289,13 +311,46 @@ app.post('/user-register', function (req, res) {
 
 	if (!username || !password || !password_repeat) {
 		res.render('user-register', { error: 'Please fill in all required fileds' });
+		return;
 	}
 
 	if (password != password_repeat) {
 		res.render('user-register', { error: 'passwords do not match' });
+		return;
 	}
 
 	checkIfAccountExists(req, res, user_register);
+});
+
+app.get('/change-password', function (req, res) {
+	if (!req.session.loggedin) {
+		res.render('index', { info: 'not allowed', clients: clients, authServer: authServer });
+		return;
+	}
+	res.render('change-password', { error: '' });
+});
+
+app.post('/change-password', function (req, res) {
+	if (!req.session.loggedin) {
+		res.render('index', { info: 'not allowed', clients: clients, authServer: authServer });
+		return;
+	}
+	var username = req.session.username;
+	var password = req.body.password;
+	var password_new = req.body.password_new;
+	var password_repeat = req.body.password_repeat;
+
+	if (!password || !password_new || !password_repeat) {
+		res.render('change-password', { error: 'Please fill in all required fileds' });
+		return;
+	}
+
+	if (password_new != password_repeat) {
+		res.render('change-password', { error: 'passwords do not match' });
+		return;
+	}
+
+	updatePassword(req, res);
 });
 
 app.get('/login', function (req, res) {
@@ -323,6 +378,7 @@ app.get("/authorize", function (req, res) {
 		console.log('not logged in, redirect to /login');
 		var newUrl = buildUrl('/login', req.query);
 		res.render('login', { login_url: newUrl });
+		return;
 	} else {
 		var client = getClient(req.query.client_id);
 
