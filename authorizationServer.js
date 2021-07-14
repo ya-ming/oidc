@@ -1,3 +1,6 @@
+var fs = require('fs');
+var fs = require('fs');
+var https = require('https');
 var express = require("express");
 var url = require("url");
 var bodyParser = require('body-parser');
@@ -18,6 +21,13 @@ var request = require("sync-request");
 var cookieParser = require('cookie-parser');
 var csrf = require('csurf');
 var csrfProtection = csrf({ cookie: true });
+
+const options = {
+	key: fs.readFileSync('files/certs/auth-server-key.pem'),
+	cert: fs.readFileSync('files/certs/auth-server-cert.pem')
+};
+process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
+
 
 var app = express();
 
@@ -40,12 +50,13 @@ app.set('json spaces', 4);
 
 // authorization server information
 var authServer = {
-	authorizationEndpoint: 'http://20.0.0.25:9001/authorize',
-	tokenEndpoint: 'http://20.0.0.25:9001/token',
-	userInfoEndpoint: 'http://30.0.0.30:9002/userinfo',
-	logoutEndpoint: 'http://20.0.0.25:9001/logout',
-	registrationEndpoint: 'http://20.0.0.25:9001/register',
-	jwksEndpoint: 'http://20.0.0.25:9001/jwks',
+	issuer: "https://20.0.0.25:9001/",
+	authorizationEndpoint: 'https://20.0.0.25:9001/authorize',
+	tokenEndpoint: 'https://20.0.0.25:9001/token',
+	userInfoEndpoint: 'https://30.0.0.30:9002/userinfo',
+	logoutEndpoint: 'https://20.0.0.25:9001/logout',
+	registrationEndpoint: 'https://20.0.0.25:9001/register',
+	jwksEndpoint: 'https://20.0.0.25:9001/jwks',
 	backchannel_logout_supported: true
 };
 
@@ -54,9 +65,9 @@ var clients = [
 	{
 		"client_id": "oauth-client-1",
 		"client_secret": "oauth-client-secret-1",
-		"redirect_uris": ["http://10.0.0.10:9000/callback"],
-		"post_logout_redirect_uri": "http://10.0.0.10:9000/post_logout_redirect_uri",
-		"backchannel_logout_uri": "http://10.0.0.10:9000/backchannel_logout_uri",
+		"redirect_uris": ["https://10.0.0.10:9000/callback"],
+		"post_logout_redirect_uri": "https://10.0.0.10:9000/post_logout_redirect_uri",
+		"backchannel_logout_uri": "https://10.0.0.10:9000/backchannel_logout_uri",
 		"scope": "openid profile email phone address"
 	}
 ];
@@ -268,7 +279,7 @@ var logoutFromAllRPs = function (sub) {
 					var header = { 'typ': 'JWT', 'alg': rsaKey.alg, 'kid': rsaKey.kid };
 
 					var ipayload = {
-						iss: 'http://localhost:9001/',
+						iss: 'https://20.0.0.25:9001/',
 						sub: sub,
 						aud: client.client_id,
 						iat: Math.floor(Date.now() / 1000),
@@ -300,7 +311,7 @@ var logoutFromAllRPs = function (sub) {
 	});
 }
 
-var isLoggedIn = function(req, res, next) {
+var isLoggedIn = function (req, res, next) {
 	if (!req.session.loggedin) {
 		res.render('index', { info: 'not allowed', clients: clients, authServer: authServer });
 		return;
@@ -533,7 +544,7 @@ app.post("/token", function (req, res) {
 					var header = { 'typ': 'JWT', 'alg': rsaKey.alg, 'kid': rsaKey.kid };
 
 					var ipayload = {
-						iss: 'http://localhost:9001/',
+						iss: 'https://20.0.0.25:9001/',
 						sub: code.user.sub,
 						aud: client.client_id,
 						iat: Math.floor(Date.now() / 1000),
@@ -793,11 +804,12 @@ app.use('/', express.static('files/authorizationServer'));
 nosql.clear();
 nosql_logout.clear();
 
-var server = app.listen(9001, '20.0.0.25', function () {
+var server = https.createServer(options, app);
+server.listen(9001, '20.0.0.25', function () {
 	var host = server.address().address;
 	var port = server.address().port;
 
-	console.log('OIDC Authorization Server is listening at http://%s:%s', host, port);
+	console.log('OIDC Authorization Server is listening at https://%s:%s', host, port);
 });
 
 module.exports = app; // for testing

@@ -1,3 +1,5 @@
+var fs = require('fs');
+var https = require('https');
 var express = require("express");
 var bodyParser = require('body-parser');
 var session = require('express-session');
@@ -25,7 +27,13 @@ if (argv.port) {
 	port = argv.port;
 }
 
-var base_url = 'http://' + ip + ':' + port;
+const options = {
+	key: fs.readFileSync('files/certs/client-key.pem'),
+	cert: fs.readFileSync('files/certs/client-cert.pem')
+};
+process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
+
+var base_url = 'https://' + ip + ':' + port;
 console.log('base_url: ' + base_url);
 
 var app = express();
@@ -54,13 +62,13 @@ var client = {
 
 // authorization server information
 var authServer = {
-	// authorizationEndpoint: 'http://20.0.0.25:9001/authorize',
-	// tokenEndpoint: 'http://20.0.0.25:9001/token',
-	// userInfoEndpoint: 'http://30.0.0.30:9002/userinfo',
-	// logoutEndpoint: 'http://20.0.0.25:9001/logout',
-	// registrationEndpoint: 'http://20.0.0.25:9001/register'
-	// jwksEndpoint: 'http://20.0.0.25:9001/jwks'
-	openid_configuration: 'http://20.0.0.25:9001/.well-known/openid-configuration'
+	// authorizationEndpoint: 'https://20.0.0.25:9001/authorize',
+	// tokenEndpoint: 'https://20.0.0.25:9001/token',
+	// userInfoEndpoint: 'https://30.0.0.30:9002/userinfo',
+	// logoutEndpoint: 'https://20.0.0.25:9001/logout',
+	// registrationEndpoint: 'https://20.0.0.25:9001/register'
+	// jwksEndpoint: 'https://20.0.0.25:9001/jwks'
+	openid_configuration: 'https://20.0.0.25:9001/.well-known/openid-configuration'
 };
 
 var rsaKey = {
@@ -71,7 +79,7 @@ var rsaKey = {
 	// "kid": "authserver"
 };
 
-var protectedResource = 'http://30.0.0.30:9002/resource';
+var protectedResource = 'https://30.0.0.30:9002/resource';
 
 // helper functions
 
@@ -176,7 +184,7 @@ var validateIdToken = function (rsaKey, body, payload, client_id) {
 	var pubKey = jose.KEYUTIL.getKey(rsaKey);
 	if (jose.jws.JWS.verify(body.id_token, pubKey, [rsaKey.alg])) {
 		console.log('Signature validated.');
-		if (payload.iss == 'http://localhost:9001/') {
+		if (payload.iss == authServer.issuer) {
 			console.log('issuer OK');
 			if ((Array.isArray(payload.aud) && __.contains(payload.aud, client_id)) ||
 				payload.aud == client_id) {
@@ -404,7 +412,7 @@ app.post('/backchannel_logout_uri', function (req, res) {
 		console.log('Payload', payload);
 		if (jose.jws.JWS.verify(req.body.logout_token, pubKey, [rsaKey.alg])) {
 			console.log('Signature validated.');
-			if (payload.iss == 'http://localhost:9001/') {
+			if (payload.iss == authServer.issuer) {
 				console.log('issuer OK');
 				if ((Array.isArray(payload.aud) && __.contains(payload.aud, client.client_id)) ||
 					payload.aud == client.client_id) {
@@ -431,10 +439,12 @@ app.post('/backchannel_logout_uri', function (req, res) {
 
 app.use('/', express.static('files/client'));
 
-var server = app.listen(port, ip, function () {
+var server = https.createServer(options, app);
+
+server.listen(port, ip, function () {
 	var host = server.address().address;
 	var port = server.address().port;
-	console.log('OIDC Client is listening at http://%s:%s', host, port);
+	console.log('OIDC Client is listening at https://%s:%s', host, port);
 });
 
 exports.encodeClientCredentials = encodeClientCredentials;

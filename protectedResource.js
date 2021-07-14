@@ -1,3 +1,5 @@
+var fs = require('fs');
+var https = require('https');
 var express = require("express");
 var url = require("url");
 var bodyParser = require('body-parser');
@@ -11,6 +13,12 @@ var __ = require('underscore');
 var base64url = require('base64url');
 var jose = require('jsrsasign');
 var cors = require('cors');
+
+const options = {
+	key: fs.readFileSync('files/certs/ps-key.pem'),
+	cert: fs.readFileSync('files/certs/ps-cert.pem')
+};
+process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
 
 var app = express();
 
@@ -133,11 +141,11 @@ var userInfoEndpoint = function (req, res) {
 app.get('/userinfo', getAccessToken, requireAccessToken, userInfoEndpoint);
 app.post('/userinfo', getAccessToken, requireAccessToken, userInfoEndpoint);
 
-
-var server = app.listen(9002, '30.0.0.30', function () {
+var server = https.createServer(options, app);
+server.listen(9002, '30.0.0.30', function () {
 	var host = server.address().address;
 	var port = server.address().port;
 
-	console.log('OIDC Resource Server is listening at http://%s:%s', host, port);
+	console.log('OIDC Resource Server is listening at https://%s:%s', host, port);
 });
 
