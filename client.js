@@ -180,11 +180,11 @@ var encodeClientCredentials = function (clientId, clientSecret) {
 	return new Buffer(querystring.escape(clientId) + ':' + querystring.escape(clientSecret)).toString('base64');
 };
 
-var validateIdToken = function (rsaKey, body, payload, client_id) {
+var validateIdToken = function (rsaKey, body, payload, client_id, issuer) {
 	var pubKey = jose.KEYUTIL.getKey(rsaKey);
 	if (jose.jws.JWS.verify(body.id_token, pubKey, [rsaKey.alg])) {
 		console.log('Signature validated.');
-		if (payload.iss == authServer.issuer) {
+		if (payload.iss == issuer) {
 			console.log('issuer OK');
 			if ((Array.isArray(payload.aud) && __.contains(payload.aud, client_id)) ||
 				payload.aud == client_id) {
@@ -317,7 +317,7 @@ app.get("/callback", function (req, res) {
 			var tokenParts = body.id_token.split('.');
 			var payload = JSON.parse(base64url.decode(tokenParts[1]));
 			console.log('Payload', payload);
-			if (validateIdToken(rsaKey, body, payload, client.client_id)) {
+			if (validateIdToken(rsaKey, body, payload, client.client_id, authServer.issuer)) {
 				// save just the payload, not the container (which has been validated)
 				req.session.id_token = payload;
 				req.session.id_token_hint = body.id_token;

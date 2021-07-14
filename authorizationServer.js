@@ -1,5 +1,4 @@
 var fs = require('fs');
-var fs = require('fs');
 var https = require('https');
 var express = require("express");
 var url = require("url");
@@ -18,6 +17,7 @@ var base64url = require('base64url');
 var jose = require('jsrsasign');
 var request = require("sync-request");
 
+const bcrypt = require("bcrypt");
 var cookieParser = require('cookie-parser');
 var csrf = require('csurf');
 var csrfProtection = csrf({ cookie: true });
@@ -144,25 +144,53 @@ var updatePassword = function (req, res) {
 	password = req.body.password;
 	password_new = req.body.password_new;
 
-	nosql_accounts.update({ username: username, password: password_new }).make(function (builder) {
+	// find the account
+	nosql_accounts.find().make(function (builder) {
 		builder.where('username', username);
-		builder.where('password', password);
-		builder.callback(function (err, count) {
-			console.log('updated documents:', count);
-			if (count == 0) {
-				res.render('change-password', { error: 'password change failed' });
+		builder.callback(async function (err, response) {
+			if (response[0]) {
+				console.log("We found the account: ", response[0]);
+				var account = response[0];
+				const validPassword = await bcrypt.compare(password, account.password);
+				if (!validPassword) {
+					res.render('error', { error: 'invalid password' });
+					return;
+				}
+
+				// update the password
+				const salt = await bcrypt.genSalt(10);
+				var saltedPassword = await bcrypt.hash(password_new, salt);
+				nosql_accounts.update({ username: username, password: saltedPassword }).make(function (builder) {
+					builder.where('username', username);
+					builder.callback(function (err, count) {
+						console.log('updated documents:', count);
+						if (count == 0) {
+							res.render('change-password', { error: 'password change failed' });
+							return;
+						}
+						res.render('index', { info: 'password updated successfully', clients: clients, authServer: authServer });
+						return;
+					});
+				});
+			} else {
+				// should not reach here
+				console.log('No matching account was found.');
+				res.render('error', { error: 'invalid username or password' });
 				return;
 			}
-			res.render('index', { info: 'password updated successfully', clients: clients, authServer: authServer });
+			next();
 			return;
 		});
 	});
 };
 
-var user_register = function (req, res) {
+var user_register = async function (req, res) {
+	const salt = await bcrypt.genSalt(10);
+	var password = await bcrypt.hash(req.body.password, salt);
+
 	nosql_accounts.insert({
 		username: req.body.username,
-		password: req.body.password
+		password: password
 	});
 
 	res.render('index', { info: 'user registered successfully', clients: clients, authServer: authServer });
@@ -179,11 +207,12 @@ var getAccountFromDB = function (req, res, next) {
 
 	nosql_accounts.find().make(function (builder) {
 		builder.where('username', username);
-		builder.callback(function (err, response) {
+		builder.callback(async function (err, response) {
 			if (response[0]) {
 				console.log("We found the account: ", response[0]);
 				var account = response[0];
-				if (account.password != password) {
+				const validPassword = await bcrypt.compare(password, account.password);
+				if (!validPassword) {
 					res.render('error', { error: 'invalid username or password' });
 					return;
 				}

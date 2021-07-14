@@ -56,14 +56,16 @@ node client.js --ip=10.0.0.11 --port=9000
   * change password
 * Security protections
   * csrf
-* https
-  ```sh
-  # keys and certs generated via below command
-  openssl genrsa -out key.pem
-  openssl req -new -key key.pem -out csr.pem
-  openssl x509 -req -days 9999 -in csr.pem -signkey key.pem -out cert.pem
-  rm csr.pem
-  ```
+    * updated the test case to store and use the csrf from cookie and res.body
+  * https
+    ```sh
+    # keys and certs generated via below command
+    openssl genrsa -out key.pem
+    openssl req -new -key key.pem -out csr.pem
+    openssl x509 -req -days 9999 -in csr.pem -signkey key.pem -out cert.pem
+    rm csr.pem
+    ```
+  * hash the password using bcrypt
 
 ## Functionalities to add
 

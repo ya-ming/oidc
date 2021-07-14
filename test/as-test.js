@@ -19,7 +19,9 @@ let rsaKey = null;
 let Cookies = null;
 let client_id = null;
 let client_secret = null;
+let issuer = null;
 let reqid = null;
+let _csrfInbody = null;
 let code = null;
 let access_token = null;
 let id_token = null;
@@ -44,6 +46,9 @@ describe('config', () => {
         it('Get the oidc configurations', (done) => {
             request(server)
                 .get('/.well-known/openid-configuration')
+                .expect((res) => {
+                    issuer = res.body.issuer;
+                })
                 .expect(200, done);
         });
     });
@@ -120,6 +125,15 @@ describe('config', () => {
                     redirect_uri: 'http://client.example.com/cb',
                     state: 'state'
                 })
+                .expect((res) => {
+                    // save the csrf token from cookie                 
+                    var tempString = res.headers['set-cookie'].pop().split(';')[0];
+                    Cookies = Cookies + '; ' + tempString;
+                    // save the csrf token from body
+                    index = res.text.indexOf('name="_csrf" value="');
+                    end = res.text.indexOf('"', index + 20);
+                    _csrfInbody = res.text.substring(index + 20, end);
+                })
                 .expect(200, done);
         });
 
@@ -129,7 +143,7 @@ describe('config', () => {
             agent
                 .post('/login')
                 .set('Cookie', Cookies)
-                .send({ username: 'bob', password: 'bob' })
+                .send({ username: 'bob', password: 'bob', _csrf: _csrfInbody })
                 .query({
                     response_type: 'code',
                     scope: 'openid',
@@ -159,6 +173,11 @@ describe('config', () => {
                     let index = res.text.indexOf('name="reqid" value="');
                     let end = res.text.indexOf('"', index + 20);
                     reqid = res.text.substring(index + 20, end);
+
+                    // save the csrf token from body
+                    index = res.text.indexOf('name="_csrf" value="');
+                    end = res.text.indexOf('"', index + 20);
+                    _csrfInbody = res.text.substring(index + 20, end);
                 })
                 .expect(200, done);
         });
@@ -176,7 +195,7 @@ describe('config', () => {
                     redirect_uri: 'http://client.example.com/cb',
                     state: 'state'
                 })
-                .send({approve: 'approve', reqid: reqid, scope_openid: 'scope_openid'})
+                .send({ approve: 'approve', reqid: reqid, scope_openid: 'scope_openid', _csrf: _csrfInbody })
                 .expect((res) => {
                     expect(res.headers).have.property('location');
                     // save the code
@@ -204,7 +223,7 @@ describe('config', () => {
                     id_token = res.body.id_token;
                     var tokenParts = res.body.id_token.split('.');
                     var payload = JSON.parse(base64url.decode(tokenParts[1]));
-                    expect(client.validateIdToken(rsaKey, res.body, payload, client_id)).to.be.true;
+                    expect(client.validateIdToken(rsaKey, res.body, payload, client_id, issuer)).to.be.true;
                 })
                 .expect(200, done);
         });
