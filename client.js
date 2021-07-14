@@ -14,6 +14,8 @@ var base64url = require('base64url');
 var __ = require('underscore');
 __.string = require('underscore.string');
 
+const helmet = require("helmet");
+
 var argv = require('yargs/yargs')(process.argv.slice(2)).argv;
 
 var ip = '10.0.0.10';
@@ -37,6 +39,8 @@ var base_url = 'https://' + ip + ':' + port;
 console.log('base_url: ' + base_url);
 
 var app = express();
+
+app.use(helmet());
 
 app.use(session({
 	secret: 'client secret',

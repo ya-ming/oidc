@@ -13,6 +13,7 @@ var __ = require('underscore');
 var base64url = require('base64url');
 var jose = require('jsrsasign');
 var cors = require('cors');
+const helmet = require("helmet");
 
 const options = {
 	key: fs.readFileSync('files/certs/ps-key.pem'),
@@ -21,6 +22,7 @@ const options = {
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
 
 var app = express();
+app.use(helmet());
 
 app.use(bodyParser.urlencoded({ extended: true })); // support form-encoded bodies (for bearer tokens)
 

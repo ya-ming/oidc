@@ -17,6 +17,7 @@ var base64url = require('base64url');
 var jose = require('jsrsasign');
 var request = require("sync-request");
 
+const helmet = require("helmet");
 const bcrypt = require("bcrypt");
 var cookieParser = require('cookie-parser');
 var csrf = require('csurf');
@@ -30,6 +31,8 @@ process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
 
 
 var app = express();
+
+app.use(helmet());
 
 app.use(session({
 	secret: 'my secret',
@@ -677,13 +680,13 @@ app.get('/logout', function (req, res) {
 
 });
 
-app.get('/logout/confirm', function (req, res) {
+app.get('/logout/confirm', csrfProtection, function (req, res) {
 	var newUrl = buildUrl('/logout/confirm', req.query);
-	res.render('logout', { logout_url: newUrl });
+	res.render('logout', { csrfToken: req.csrfToken(), logout_url: newUrl });
 	return;
 });
 
-app.post('/logout/confirm', function (req, res) {
+app.post('/logout/confirm', csrfProtection, function (req, res) {
 	// retrive xxx from the query, convert xxx back to sub in findSubFromDB()
 	var xxx = req.query.xxx;
 	var client_id = req.query.client_id;

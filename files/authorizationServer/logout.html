@@ -42,6 +42,7 @@
 
     <div class="jumbotron">
       <form class="form" action="<%- logout_url %>" method="POST">
+        <input type="hidden" name="_csrf" value="<%- csrfToken %>">
         <p>Do you want to also logout from all RPs?</p>
         <input type="submit" class="btn btn-success" name="Yes" value="Yes">
         <input type="submit" class="btn btn-danger" name="No" value="No">

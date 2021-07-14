@@ -55,7 +55,7 @@ node client.js --ip=10.0.0.11 --port=9000
   * register
   * change password
 * Security protections
-  * csrf
+  * `csurf`
     * updated the test case to store and use the csrf from cookie and res.body
   * https
     ```sh
@@ -65,7 +65,8 @@ node client.js --ip=10.0.0.11 --port=9000
     openssl x509 -req -days 9999 -in csr.pem -signkey key.pem -out cert.pem
     rm csr.pem
     ```
-  * hash the password using bcrypt
+  * hash the password using `bcrypt`
+  * use `helmet` to secure the HTTP headers
 
 ## Functionalities to add
 
